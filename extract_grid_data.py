@@ -14,6 +14,10 @@ import subprocess, os, time
 # TODO:
 # 1. Spot check in NCL
 
+# Product string
+pstring = "FIP"
+#pstring = "CIP"
+
 # Model string
 #mstring = "num25_hrrr"
 #mid = "hrrr"
@@ -150,7 +154,7 @@ for name, group in groups:
   if DEBUG:
     print("")
     print("PROCESSING MODEL FILE:")
-    print(group.file_string.iloc[0])
+    print((group.file_string.iloc[0]))
 
   # Open multiple files so we have height info
   ncFiles = ['%s/%s' % (probURL,group.file_string.iloc[0]),'%s/%s' % (hgtURL,group.file_string.iloc[0]),'%s/%s' % (sevURL,group.file_string.iloc[0]),'%s/%s' % (sldURL,group.file_string.iloc[0]),'%s/%s' % (sevscenURL,group.file_string.iloc[0]),'%s/%s' % (spcpURL,group.file_string.iloc[0]),'%s/%s' % (vvelURL,group.file_string.iloc[0]),'%s/%s' % (rhURL,group.file_string.iloc[0]),'%s/%s' % (tmpURL,group.file_string.iloc[0]),'%s/%s' % (slwURL,group.file_string.iloc[0]),'%s/%s' % (icecURL,group.file_string.iloc[0]),'%s/%s' % (liqcURL,group.file_string.iloc[0])]
@@ -201,10 +205,10 @@ for name, group in groups:
     # Print info
     print("")
     print("PROCESSING PIREP:")
-    print(group.rawOb.iloc[icnt])
+    print((group.rawOb.iloc[icnt]))
     print("")
     print("PIREP ID:")
-    print(group.id.iloc[icnt])
+    print((group.id.iloc[icnt]))
 
     # Figure out the height bounds for this PIREP
     #pBot = (group.ibase1.iloc[icnt]*100.0)*.3048 # In meters
@@ -214,7 +218,7 @@ for name, group in groups:
     if DEBUG:
       print("")
       print("PIREP BASE/TOP:")
-      print(pBot,pTop)
+      print((pBot,pTop))
     if pBot > pTop:
       vxData['badPirep'][vxcnt] = True
       icnt = icnt + 1
@@ -399,7 +403,7 @@ for name, group in groups:
 
     # Print out a row of the dataframe to see all the data we've collected for this PIREP
     print("")
-    print(vxData.loc[[vxcnt]])
+    print((vxData.loc[[vxcnt]]))
 
     # Exit after one PIREP
     #sys.exit(0)
@@ -411,9 +415,9 @@ for name, group in groups:
     chk = xr.ufuncs.isnan(finalHood.HGT.sum(dim='z0',skipna=False).sum(skipna=False)).values
     if chk:
       print("WARNING! FOUND ODDBALL")
-      print(finalHood.dims)
-      print(finalHood.HGT.values)
-      print(finalHood.ICE_PROB.values)
+      print((finalHood.dims))
+      print((finalHood.HGT.values))
+      print((finalHood.ICE_PROB.values))
       #sys.exit(1)
     
     # Advance the PIREP counter
@@ -425,7 +429,7 @@ for name, group in groups:
     # Print time
     print("")
     print("SECONDS TO PROCESS PIREP:")
-    print(time.time()-start_time)
+    print((time.time()-start_time))
     print("")
 
   # After each model file, write out the dataframe to CSV, appending the input

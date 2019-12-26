@@ -1,11 +1,11 @@
 ;
-; File: match_ij_dataSAE.ncl
+; File: match_ij_data.ncl
 ;
 ; Author: D. Adriaansen
 ;
 ; Date: 23 May 2019
 ;
-; Purpose: Find grid cells matched to an observation (lat/lon)
+; Purpose: Find grid cells in a neighborhood matched to a point observation (lat/lon)
 ;
 ; Notes:
 ;___________________________________________________________________________
@@ -16,8 +16,8 @@ load "/home/dadriaan/cvs/pat/dadriaan/scripts/ncl/load_ncl_libs.ncl"
 ;##################################### User Config ################################;
 
 ; Path to netCDF file with grid information in it
-;nc = "/home/dadriaan/projects/sae2019/data/grids/hrrr/20190201/g_000000/f_00010800.nc"
-nc = "/home/dadriaan/projects/sae2019/data/grids/rap/20190201/g_000000/f_00010800.nc"
+nc = "/home/dadriaan/projects/sae2019/data/grids/hrrr/20190201/g_000000/f_00010800.nc"
+;nc = "/home/dadriaan/projects/sae2019/data/grids/rap/20190201/g_000000/f_00010800.nc"
 
 ; Path to point data with lat/lon info
 ptobs = "/home/dadriaan/projects/sae2019/data/pireps/PIREPSpos.csv"
@@ -45,6 +45,18 @@ nsecfcst = 10800
 
 ; What time delta do we want for matching model data to obs (seconds)?
 matchdt = 1800
+
+; Do we want to match before, after, or both?
+;matchwindow = "both"
+matchwindow = "after"
+;matchwindow = "before"
+
+; Match minutes
+; For FIP, set to 0. For CIP, use minutes after the hour that CIP was run.
+matchmins = 8
+
+; What mode? Options are "CIP" or "FIP"
+mode = "CIP"
 
 ;##################################################################################;
 
@@ -118,23 +130,68 @@ do n=0,dimsizes(ut)-1,1
   omn = obtime(:,4)
   osc = obtime(:,5)
 
-  ; Create a lower time equal to HR:00:00 of the observation
+  ; Create a lower time equal to HR:00:00 of the observation. This is essentially floor(obtime), or the top of the hour
+  ; containing the observation. tlower always <= obtime.
   opt = 0
-  tlower = cd_inv_calendar(toint(oyr),toint(omo),toint(ody),toint(ohr),0,0,"seconds since 1970-1-1 00:00:00",opt)
-
-  ; Create an upper time equal to HR+1:00:00 of the observation
-  tupper = tlower+3600
-
-  ; Find the closest time. If the delta between the observation and the lower time is < 30 minutes, then it will
-  ; match to the previous top of the hour. Otherwise (delta >= 30 minutes), it will jump to the next hour.
-  if (curr-tlower).lt.1800 then
-    tmatch = tlower
-  else
-    tmatch = tupper
+  tlower = cd_inv_calendar(toint(oyr),toint(omo),toint(ody),toint(ohr),toint(matchmins),0,"seconds since 1970-1-1 00:00:00",opt)
+  if tlower.gt.curr then
+    tlower = tlower-3600
   end if
 
+  ; Create an upper time equal to HR+1:00:00 of the observation. This will be the upper bound of the observation time.
+  ; tupper always >= obtime.
+  tupper = tlower+3600
+
+  ; Figure out the tmatch, based on the matching method requested
+  if matchwindow.eq."both" then
+
+    ; Find the closest time. If the delta between the observation and the lower time is < 30 minutes, then it will
+    ; match to the previous top of the hour. Otherwise (delta >= 30 minutes), it will jump to the next hour.
+    if (curr-tlower).lt.matchdt then
+      tmatch = tlower
+    else
+      tmatch = tupper
+    end if
+  end if
+  if matchwindow.eq."after" then
+    
+    ; Find the closest time. If the delta between the observation and the lower time is < matchdt seconds, then it will
+    ; match to the tlower. Othwerwise (delta >= matchdt seconds), it will skip this PIREP and not use it.
+    if (curr-tlower).lt.matchdt then
+      tmatch = tlower
+    else
+      print("")
+      print("SKIPPING PIREP. OUTSIDE TIME BOUNDS.")
+      continue
+    end if
+  end if
+  if matchwindow.eq."before" then
+  
+    ; Find the closest time. If the delta between the observation and the upper time is < matchdt seconds, then it will
+    ; match to the tupper. Otherwise (delta >= matchdt seconds), it will skip this PIREP and not use it.
+    if (tupper-curr).lt.matchdt then
+      tmatch = tupper
+    else
+      print("")
+      print("SKIPPING PIREP. OUTSIDE THE TIME BOUNDS.")
+      continue
+    end if
+  end if
+  ;print(""+matchwindow)
+  ;print(""+matchdt)
+  ;print(""+matchmins)
+  ;cStr = prettyPrint(curr,"ymdhms")
+  ;print(""+cStr)
+  ;mStr = prettyPrint(toint(tmatch),"ymdhms")
+  ;print(""+mStr)
+  ;continue 
+
   ; Back out the init time/date for the best match
-  init = tmatch-(nsecfcst)
+  if mode.eq."FIP" then
+    init = tmatch-(nsecfcst)
+  else
+    init = tmatch
+  end if
   init@units = "seconds since 1970-1-1 00:00:00"
   di = cd_calendar(init,0)
   iyr = di(:,0)
@@ -142,9 +199,14 @@ do n=0,dimsizes(ut)-1,1
   idy = di(:,2)
   ihr = di(:,3)
   istring = sprinti("%.4i",toint(iyr))+sprinti("%.2i",toint(imo))+sprinti("%.2i",toint(idy))
-  gstring = "g_"+sprinti("%.2i",toint(ihr))+"0000"
-  fname = "f_"+sprinti("%.8i",toint(nsecfcst))+".nc"
-  file_string = istring+"/"+gstring+"/"+fname
+  if mode.eq."FIP" then
+    gstring = "g_"+sprinti("%.2i",toint(ihr))+"0000"
+    fname = "f_"+sprinti("%.8i",toint(nsecfcst))+".nc"
+    file_string = istring+"/"+gstring+"/"+fname
+  else
+    fname = sprinti("%.2i",toint(ihr))+sprinti("%.2i",toint(matchmins))+"00.nc"
+    file_string = istring+"/"+istring+"_"+fname
+  end if
 
   ; Construct a string identifying the path to the correct model file for these times
   ; TODO: Only do this when we are finding exact files. We can just write out the istring,gstring,fname and match to

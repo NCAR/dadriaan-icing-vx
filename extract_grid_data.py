@@ -13,7 +13,6 @@ import subprocess, os, time
 
 # TODO:
 # 1. Spot check in NCL
-# 2. Write out min/max values in neighborhood (finalhood) then we can do scoring elsewhere
 
 # Model string
 #mstring = "num25_hrrr"
@@ -71,19 +70,19 @@ probsevthresh = 0.05 # (5%)
 slwthresh = 1.0e-6
 
 # Column names for dataframe of results that will be appended to the dataframe of the input data
-vxCols = ['id','file_string','probFYOY','probFNON','probFNOY','probFYON','sevFYOY','sevFNON','sevFNOY','sevFYON','VVELnear','VVELmean','VVELmed','VVELstdev','RHnear','RHmean','RHmed','RHstdev','SLWnear','SLWmean','SLWmed','SLWstdev','TMPnear','TMPmean','TMPmed','TMPstdev','PCPnear','PCPmode','PCPuni','PCPs','SCENnear','SCENmode','SCENuni','SCENs','nPtsHood','nLevHood','nPtsStats','isMulti','levNear','zNear','badPirep','slwFYOY','slwFYON','slwFNOY','slwFNON','probMIN','probMAX','sevMIN','sevMAX','VVELmin','VVELmax','RHmin','RHmax','TMPmin','TMPmax','SLWmin','SLWmax','ICECmin','ICECmax','LIQCmin','LIQCmax','TOTCmin','TOTCmax']
+vxCols = ['id','file_string','probFYOY','probFNON','probFNOY','probFYON','sevFYOY','sevFNON','sevFNOY','sevFYON','VVELnear','VVELmean','VVELmed','VVELstdev','RHnear','RHmean','RHmed','RHstdev','SLWnear','SLWmean','SLWmed','SLWstdev','TMPnear','TMPmean','TMPmed','TMPstdev','PCPnear','PCPmode','PCPuni','PCPs','SCENnear','SCENmode','SCENuni','SCENs','nPtsHood','nLevHood','nPtsStats','isMulti','levNear','zNear','badPirep','slwFYOY','slwFYON','slwFNOY','slwFNON','probMIN','probMAX','sevMIN','sevMAX','VVELmin','VVELmax','RHmin','RHmax','TMPmin','TMPmax','SLWmin','SLWmax','ICECmin','ICECmax','LIQCmin','LIQCmax','TOTCmin','TOTCmax','potMIN','potMAX','sldMIN','sldMAX']
 
 # Debug flag
 DEBUG = True
 
-# Boolens for processing
-probScore = False
-sevScore = False
-slwScore = False
-vNear = False
-vMean = False
-vMed = False
-vStdev = False
+# Boolens for processing.
+vNear = True
+vMean = True
+vMed = True
+vStdev = True
+
+# Number of seconds in forecast lead
+nsecfcst = 10800
 
 # Output dataframe
 outfile = "/home/dadriaan/projects/sae2019/scripts/hrrr10800vx.csv"
@@ -155,16 +154,31 @@ for name, group in groups:
 
   # Open multiple files so we have height info
   ncFiles = ['%s/%s' % (probURL,group.file_string.iloc[0]),'%s/%s' % (hgtURL,group.file_string.iloc[0]),'%s/%s' % (sevURL,group.file_string.iloc[0]),'%s/%s' % (sldURL,group.file_string.iloc[0]),'%s/%s' % (sevscenURL,group.file_string.iloc[0]),'%s/%s' % (spcpURL,group.file_string.iloc[0]),'%s/%s' % (vvelURL,group.file_string.iloc[0]),'%s/%s' % (rhURL,group.file_string.iloc[0]),'%s/%s' % (tmpURL,group.file_string.iloc[0]),'%s/%s' % (slwURL,group.file_string.iloc[0]),'%s/%s' % (icecURL,group.file_string.iloc[0]),'%s/%s' % (liqcURL,group.file_string.iloc[0])]
-  ncData = xr.open_mfdataset(ncFiles,chunks=chunks)
+  ncData = xr.open_mfdataset(ncFiles,chunks=chunks,combine='by_coords')
   print(ncData)
-
-  # Correct ICE_PROB and ICE_SEV from NaN to 0.0
+  
+  # Correct NA values in certain variables (do this before correcting to zero)
   ncData['ICE_SEV'] = ncData.ICE_SEV.fillna(0.0)
   ncData['ICE_PROB'] = ncData.ICE_PROB.fillna(0.0)
+  ncData['SLD'] = ncData.SLD.fillna(0.0)
+  ncData['SLW'] = ncData.SLW.fillna(0.0)
+  ncData['ICE_COND'] = ncData.ICE_COND.fillna(0.0)
+  ncData['LIQ_COND'] = ncData.LIQ_COND.fillna(0.0)
   ncData['SEV_SCENARIO'] = ncData.SEV_SCENARIO.fillna(-1.0)
-  ncData['TOT_COND'] = ncData['ICE_COND']+ncData['LIQ_COND']
 
-  # Need to correct condensate variables?
+  # Correct any INT16 values that are <0 to 0.0, in fields that shouldn't have negative data
+  ncData['ICE_SEV'] = ncData.ICE_SEV.where(ncData.ICE_SEV>0.0,0.0)
+  ncData['ICE_PROB'] = ncData.ICE_PROB.where(ncData.ICE_PROB>0.0,0.0)
+  ncData['SLD'] = ncData.SLD.where(ncData.SLD>0.0,0.0)
+  ncData['SLW'] = ncData.SLW.where(ncData.SLW>0.0,0.0)
+  ncData['ICE_COND'] = ncData.ICE_COND.where(ncData.ICE_COND>0.0,0.0)
+  ncData['LIQ_COND'] = ncData.LIQ_COND.where(ncData.LIQ_COND>0.0,0.0)
+
+  # Back out the icing potential value
+  ncData['ICE_POT'] = ncData['ICE_PROB']/((-0.033*(nsecfcst/3600)+0.84))
+
+  # Add a total condensate variable
+  ncData['TOT_COND'] = ncData['ICE_COND']+ncData['LIQ_COND']
 
   # Loop over each item in the series
   icnt = 0
@@ -191,37 +205,6 @@ for name, group in groups:
     print("")
     print("PIREP ID:")
     print(group.id.iloc[icnt])
-
-    # Store the PIREP severity for use in Vx
-    pSev = group.iint1.iloc[icnt]
-
-    # Map the PIREP sev to FIP sev
-    # Group SEV1-SEV2 mixed with SEV2
-    # TRC = 1
-    # LGT = 2,3
-    # MOD = 4,5
-    # HVY = 6,7
-    # NULL = -1
-    # FIPNO = 0
-    # FIPTRC = 1
-    # FIPLGT = 2
-    # FIPMOD = 3
-    # FIPHVY = 4
-    repNULL = False
-    repTRC = False
-    repLGT = False
-    repMOD = False
-    repHVY = False
-    if str(pSev) in ['-1']:
-      repNULL = True
-    if str(pSev) in ['1']:
-      repTRC = True
-    if str(pSev) in ['2','3']:
-      repLGT = True
-    if str(pSev) in ['4','5']:
-      repMOD = True
-    if str(pSev) in ['6','7']:
-      repHVY = True
 
     # Figure out the height bounds for this PIREP
     #pBot = (group.ibase1.iloc[icnt]*100.0)*.3048 # In meters
@@ -315,122 +298,6 @@ for name, group in groups:
     vxData['levNear'][vxcnt] = nearestFinal.z0.values[0]
     vxData['zNear'][vxcnt] = nearestFinal.HGT.values[0][0]*3.281
 
-    # Set some boolean variables to determine if there are any severities matching the PIREP in the neighborhood
-    # TRUE = all missing, none of that severity found
-    # FALSE = not all missing, at lease one of that severity found
-    #
-    # applied NOT: TRUE = at least one severity found of this category
-    #              FALSE = none of that severity found of this category
-    #fipNONE = not xr.ufuncs.isnan(finalHood.ICE_SEV.where(finalHood.ICE_SEV==0.0).values).all()
-    fipTRC = not xr.ufuncs.isnan(finalHood.ICE_SEV.where((finalHood.ICE_SEV>0.0) & (finalHood.ICE_SEV<0.25)).values).all()
-    fipLGT = not xr.ufuncs.isnan(finalHood.ICE_SEV.where((finalHood.ICE_SEV>=0.25) & (finalHood.ICE_SEV<0.425)).values).all()
-    fipMOD = not xr.ufuncs.isnan(finalHood.ICE_SEV.where((finalHood.ICE_SEV>=0.425) & (finalHood.ICE_SEV<0.75)).values).all()
-    fipHVY = not xr.ufuncs.isnan(finalHood.ICE_SEV.where((finalHood.ICE_SEV>=0.75) & (finalHood.ICE_SEV<=1.0)).values).all()
-    if finalHood.ICE_SEV.values.sum()==0.0:
-      fipNULL = True
-    else:
-      fipNULL = False
-
-    print("")
-    print("PIREP/FIP SEV:")
-    print(repNULL,repTRC,repLGT,repMOD,repHVY)
-    print(fipNULL,fipTRC,fipLGT,fipMOD,fipHVY)
-
-    # SCORING
-    # FYOY = Model/FIP Yes, PIREP Yes (Correct Hit) (PODy)
-    # FYON = Model/FIP Yes, PIREP No  (False Alarm)
-    # FNOY = Model/FIP No, PIREP Yes  (Miss)
-    # FNON = Model/FIP No, PIREP No   (Correct Null) (PODn)
-    # POFD = 1-PODn "viewed as a limited measure of false alarms, since it is the fraction of the observed "no" events that were incorrectly forecast as "yes".
-
-    # RULES:
-    # 1. For probPODy, if any of the ICE_PROB points are above the probpodthresh then it's a hit.
-    # 2. For all ICE_PROB > sevprobthresh, see if there's an ICE_SEV that matches the pSEV. If so, then a hit.
-    # 3. Keep track of cases where there was a False Alarm (FYON), or where there was a miss (FNOY) for investigation
-    # 4. For PODn_ICE_PROB, if the entire volume of ICE_PROB was 0.0 or NaN, and the PIREP is null, it's correct null.
-    # 5. For PODn_ICE_SEV, if the entire volume of ICE_SEV was 0.0 or NaN, and PIREP is null, it's correct null.
-    # 6. For distributions of MODEL_VAR, use the closest point. Find all non-NaN points in the bubble column. Three answers needed:
-    #    a. nearest- just take the MODEL_VAR at this level
-    #    XX b. mean- take the mean of all MODEL_VAR at this level within the X-Y neighborhood
-    #    XX c. median- take the median of all MODEL_VAR at this level within the X-Y neighborhood
-    #    XX d. stdev- take the stdev of all MODEL_VAR at this level within the X-Y neighborhood
-    #    e. mean- take the mean of all MODEL_VAR in the entire bubble
-    #    f. median- take the median of all MODEL_VAR in the entire bubble
-    #    g. stdev- take the stdev of all MODEL_VAR in the entire bubble
-    #    QQ: Which is more appropriate? Entire bubble or X-Y neighborhood? --> neighborhood
-    #  7. For FIP diagnostic variables- what do we want to do?
-    #     a. For SURF_PRECIP, it's likely to vary in the horizontal. Should we just take the NEAREST? What else could we do?
-    #        I think we could also take the count of all the various ones in the neighborhood? Most frequent maybe is better,
-    #        compared with nearest also.
-    #     b. For SEV_SCENARIO, we probably want the same. We probably want the "most frequent" (mode) and then compare that
-    #        with NEAREST
-
-    # Append all data to the CSV dataframe!
-    if probScore:
-      print("PROB")
-      # Probability block- 4 values, can only be one. Don't explicitly set the others they will automatically be NaN
-      if pSev > 0 and finalHood.ICE_PROB.max() > probthresh:
-        # FYOY
-        vxData['probFYOY'][vxcnt] = 1
-      if pSev < 0 and finalHood.ICE_PROB.max() == 0.0 and finalHood.ICE_PROB.min() == 0.0:    
-        # FNON
-        vxData['probFNON'][vxcnt] = 1
-      if pSev > 0 and finalHood.ICE_PROB.max() < probthresh:
-        # FNOY
-        vxData['probFNOY'][vxcnt] = 1
-      if pSev < 0 and finalHood.ICE_PROB.max() > 0.0:
-        # FYON
-        vxData['probFYON'][vxcnt] = 1
-
-    if slwScore:
-      print("SLW")
-      # SLW block- 4 values, can only be one.
-      if pSev > 0 and finalHood.SLW.max() > slwthresh:
-        # FYOY
-        vxData['slwFYOY'][vxcnt] = 1
-      if pSev < 0 and finalHood.SLW.max() == 0.0 and finalHood.SLW.min() == 0.0:
-        # FNON
-        vxData['slwFNON'][vxcnt] = 1
-      if pSev > 0 and finalHood.SLW.max() < slwthresh:
-        # FNOY
-        vxData['slwFNOY'][vxcnt] = 1
-      if pSev < 0 and finalHood.SLW.max() > 0.0:
-        # FYON
-        vxData['slwFYON'][vxcnt] = 1
-
-### --> NEEDS WORK
-    # Threshold the ICE_SEV continuous field using FIP thresholds?
-    # For FIP, 0.0 = NONE, 0-0.25 = TRC, 0.25-0.425 = LGT, 0.425-0.75 = MOD, 0.75-1.0 = HVY
-    # >= previous and <= current
-    # i.e., >= 0.0 and <= 0.25, >= 0.25 and <= 0.425, >= 0.425 and <= 0.75, >= 0.75 and <= 1.0
-    # -or-, <= 0.0 = NONE, > 0.0 and < 0.25 = TRC, >= 0.25 and < 0.425 = LGT, >= 0.425 and < 0.75 = MOD, >= 0.75 and <= 1.0 = HVY
-    
-    # The key may be to create 4 separate variables with all sevs masked outside the range for each category but how will this help?
-
-    # Severity block- 4 values, can only be one. Don't explicitly set the others they will automatically be NaN
-    # syncSev is the PIREP severity matched to the FIP thresholds.
-    # if syncSev is 3, and there's any 3 FIP severity in the neighborhood then it's a hit (FYOY)
-    # if syncSev is 3 and there's other severities >0.0 but no 3's, then it's a miss (FNOY)
-    # if syncSev is -1 and all severities are 0.0 then it's a correct null (FNON)
-    # if syncSev is -1 and there's other severities >0.0, then it's a false alarm (FYON)
-
-    if sevScore:
-      print("SEV")
-      if (repTRC and fipTRC) or (repLGT and fipLGT) or (repMOD and fipMOD) or (repHVY and fipHVY):
-        # FYOY
-        vxData['sevFYOY'][vxcnt] = 1
-      else:
-        if ((repTRC) and (fipLGT or fipMOD or fipHVY and not fipTRC)) or ((repLGT) and (fipTRC or fipMOD or fipHVY and not fipLGT)) or ((repMOD) and (fipLGT or fipTRC or fipHVY and not fipMOD)) or ((repHVY) and (fipLGT or fipTRC or fipMOD and not fipHVY)) or ((repTRC or repLGT or repMOD or repHVY) and (fipNULL)):
-          # FNOY
-          vxData['sevFNOY'][vxcnt] = 1
-      if (repNULL) and (fipNULL):
-        # FNON
-        vxData['sevFNON'][vxcnt] = 1
-      if (repNULL) and not (fipNULL):
-        # FYON
-        vxData['sevFYON'][vxcnt] = 1
-### <-- NEEDS WORK
-
     # VARnear: val
     if vNear:
       print("NEAR")
@@ -468,8 +335,8 @@ for name, group in groups:
     print("MIN/MAX")
     vxData['probMIN'][vxcnt] = finalHood.ICE_PROB.min().values
     vxData['probMAX'][vxcnt] = finalHood.ICE_PROB.max().values
-    vxData['sevMIN'][vxcnt] = finalHood.ICE_SEV.min().values
-    vxData['sevMAX'][vxcnt] = finalHood.ICE_SEV.max().values
+    vxData['sevMIN'][vxcnt] = finalHood.ICE_SEV.min(skipna=True).values
+    vxData['sevMAX'][vxcnt] = finalHood.ICE_SEV.max(skipna=True).values
     vxData['VVELmin'][vxcnt] = finalHood.VVEL.min().values
     vxData['VVELmax'][vxcnt] = finalHood.VVEL.max().values
     vxData['RHmin'][vxcnt] = finalHood.RH.min().values
@@ -484,6 +351,10 @@ for name, group in groups:
     vxData['LIQCmax'][vxcnt] = finalHood.LIQ_COND.max().values
     vxData['TOTCmin'][vxcnt] = finalHood.TOT_COND.min().values
     vxData['TOTCmax'][vxcnt] = finalHood.TOT_COND.max().values
+    vxData['sldMIN'][vxcnt] = finalHood.SLD.min().values
+    vxData['sldMAX'][vxcnt] = finalHood.SLD.max().values
+    vxData['potMIN'][vxcnt] = finalHood.ICE_POT.min().values
+    vxData['potMAX'][vxcnt] = finalHood.ICE_POT.max().values
     
     # PCPnear: val
     print("PCP")

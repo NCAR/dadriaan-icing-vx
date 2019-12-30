@@ -24,14 +24,14 @@ ptobs = "/home/dadriaan/projects/sae2019/data/pireps/PIREPSpos.csv"
 ;ptobs = "/home/dadriaan/projects/sae2019/data/pireps/PIREPSposneg.csv"
 
 ; Path to output file
-;out = "/home/dadriaan/projects/sae2019/data/match/hrrr/PIREPShrrr.out"
-out = "/home/dadriaan/projects/sae2019/data/match/rap/PIREPSrap.out"
+out = "/home/dadriaan/projects/sae2019/data/match/hrrr/PIREPShrrr.out"
+;out = "/home/dadriaan/projects/sae2019/data/match/rap/PIREPSrap.out"
 
 ; How many points on the side of the square in our neighborhood?
 ; For HRRR, 8 = 8x8 = 64 pts = 24 km^2 area
 ; For RAP, 2 = 2x2 = 4 pts = 26 km^2 area
-;nside = 8
-nside = 2
+nside = 8
+;nside = 2
 
 ; Offset, to start at the largest bounding square
 offset = (nside/2)-1
@@ -47,16 +47,13 @@ nsecfcst = 10800
 matchdt = 1800
 
 ; Do we want to match before, after, or both?
-;matchwindow = "both"
-matchwindow = "after"
+matchwindow = "both"
+;matchwindow = "after"
 ;matchwindow = "before"
 
 ; Match minutes
 ; For FIP, set to 0. For CIP, use minutes after the hour that CIP was run.
-matchmins = 8
-
-; What mode? Options are "CIP" or "FIP"
-mode = "CIP"
+matchmins = 0
 
 ;##################################################################################;
 
@@ -187,26 +184,19 @@ do n=0,dimsizes(ut)-1,1
   ;continue 
 
   ; Back out the init time/date for the best match
-  if mode.eq."FIP" then
-    init = tmatch-(nsecfcst)
-  else
-    init = tmatch
-  end if
+  valid = tmatch
+  init = tmatch-(nsecfcst)
+  valid@units = "seconds since 1970-1-1 00:00:00"
   init@units = "seconds since 1970-1-1 00:00:00"
-  di = cd_calendar(init,0)
-  iyr = di(:,0)
-  imo = di(:,1)
-  idy = di(:,2)
-  ihr = di(:,3)
-  istring = sprinti("%.4i",toint(iyr))+sprinti("%.2i",toint(imo))+sprinti("%.2i",toint(idy))
-  if mode.eq."FIP" then
-    gstring = "g_"+sprinti("%.2i",toint(ihr))+"0000"
-    fname = "f_"+sprinti("%.8i",toint(nsecfcst))+".nc"
-    file_string = istring+"/"+gstring+"/"+fname
-  else
-    fname = sprinti("%.2i",toint(ihr))+sprinti("%.2i",toint(matchmins))+"00.nc"
-    file_string = istring+"/"+istring+"_"+fname
-  end if
+  dvt = cd_calendar(valid,0)
+  dit = cd_calendar(init,0)
+  vstring = sprinti("%.4i",toint(dvt(:,0)))+sprinti("%.2i",toint(dvt(:,1)))+sprinti("%.2i",toint(dvt(:,2)))
+  istring = sprinti("%.4i",toint(dit(:,0)))+sprinti("%.2i",toint(dit(:,1)))+sprinti("%.2i",toint(dit(:,2)))
+  gstring = "g_"+sprinti("%.2i",toint(dit(:,3)))+"0000"
+  mfname = "f_"+sprinti("%.8i",toint(nsecfcst))+".nc"
+  mfile_string = istring+"/"+gstring+"/"+mfname
+  fname = sprinti("%.2i",toint(dvt(:,3)))+sprinti("%.2i",toint(matchmins))+"00.nc"
+  file_string = vstring+"/"+vstring+"_"+fname
 
   ; Construct a string identifying the path to the correct model file for these times
   ; TODO: Only do this when we are finding exact files. We can just write out the istring,gstring,fname and match to
@@ -424,8 +414,8 @@ do n=0,dimsizes(ut)-1,1
 
   ; Write out some data to a file
   ; ID,unix_time (obs),lat,lon,flvl,tmp,ibase1,itop1,iint1,ityp1,ibase2,itop2,iint2,ityp2,acft,rawObs,unix_time (valid),forecast,minI,maxI,minJ,maxJ,npts,file_string
-  format = "%d,%d,%f,%f,%d,%f,%d,%d,%d,%d,%d,%d,%d,%d,%s,%s,%d,%d,%d,%d,%d,%d,%d,%d,%s,%d,%s"
-  alist = [/idcnt,ut(n),olat(n),olon(n),flvl(n),temp(n),ibase1(n),itop1(n),iint1(n),ityp1(n),ibase2(n),itop2(n),iint2(n),ityp2(n),acft(n),rawObs(n),toint(tmatch),nsecfcst,minI,maxI,minJ,maxJ,homeI,homeJ,corner,totPts,file_string/]
+  format = "%d,%d,%f,%f,%d,%f,%d,%d,%d,%d,%d,%d,%d,%d,%s,%s,%d,%d,%d,%d,%d,%d,%d,%d,%s,%d,%s,%s"
+  alist = [/idcnt,ut(n),olat(n),olon(n),flvl(n),temp(n),ibase1(n),itop1(n),iint1(n),ityp1(n),ibase2(n),itop2(n),iint2(n),ityp2(n),acft(n),rawObs(n),toint(tmatch),nsecfcst,minI,maxI,minJ,maxJ,homeI,homeJ,corner,totPts,mfile_string,file_string/]
   write_table(out,"a",alist,format)
 
   ; Advance counters

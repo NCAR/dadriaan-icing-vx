@@ -30,8 +30,8 @@ chunks = {'y0':160,'x0':160} # RAP (39x337x451), chunk = (39x160x160)
 #matchfile = "/home/dadriaan/projects/sae2019/data/match/hrrr/PIREPShrrr21600posneg.out"
 #matchfile = "/home/dadriaan/projects/sae2019/data/match/hrrr/PIREPShrrr10800posneg.out"
 #matchfile = "/home/dadriaan/projects/sae2019/data/match/rap/PIREPSrap21600posneg.out"
-#matchfile = "/home/dadriaan/projects/sae2019/data/match/rap/PIREPSrap10800posneg.out"
-matchfile = "/home/dadriaan/projects/sae2019/data/match/rap/pirepTest.out"
+matchfile = "/home/dadriaan/projects/sae2019/data/match/rap/PIREPSrap10800posneg.out"
+#matchfile = "/home/dadriaan/projects/sae2019/data/match/rap/pirepTest.out"
 #matchfile = "/home/dadriaan/projects/sae2019/data/match/hrrr/pirepTest.out"
 
 # Variable URL's
@@ -58,7 +58,7 @@ bubble = 1000
 dz = 25
 
 # Column names in CSV file
-colNames = ['id','unixObs','lat','lon','flvl','temp','ibase1','itop1','iint1','ityp1','ibase2','itop2','iint2','ityp2','acft','rawOb','unixFcst','forecast','minI','maxI','minJ','maxJ','homeI','homeJ','corner','npts','file_string']
+colNames = ['id','unixObs','lat','lon','flvl','temp','ibase1','itop1','iint1','ityp1','ibase2','itop2','iint2','ityp2','acft','rawOb','unixFcst','forecast','minI','maxI','minJ','maxJ','homeI','homeJ','corner','npts','mfile_string','file_string']
 
 # Threshold for probability to use for scoring
 probthresh = 0.05 # (5%)
@@ -85,10 +85,12 @@ vStdev = True
 nsecfcst = 10800
 
 # Output dataframe
-outfile = "/home/dadriaan/projects/sae2019/scripts/hrrr10800vx.csv"
-#outfile = "/home/dadriaan/projects/sae2019/scripts/hrrr21600vx.csv"
-#outfile = "/home/dadriaan/projects/sae2019/scripts/rap10800vx.csv"
-#outfile = "/home/dadriaan/projects/sae2019/scripts/rap21600vx.csv"
+#outfile = "/home/dadriaan/projects/sae2019/icing-vx/hrrr10800vx.csv"
+#outfile = "/home/dadriaan/projects/sae2019/icing-vx/hrrr21600vx.csv"
+outfile = "/home/dadriaan/projects/sae2019/icing-vx/rap10800vx.csv"
+#outfile = "/home/dadriaan/projects/sae2019/icing-vx/rap21600vx.csv"
+#outfile = "/home/dadriaan/projects/sae2019/icing-vx/rapTestvx.csv"
+#outfile = "/home/dadriaan/projects/sae2019/icing-vx/hrrrTestvx.csv"
 
 ############################################################################
 
@@ -150,10 +152,10 @@ for name, group in groups:
   if DEBUG:
     print("")
     print("PROCESSING MODEL FILE:")
-    print((group.file_string.iloc[0]))
+    print((group.mfile_string.iloc[0]))
 
   # Open multiple files so we have height info
-  ncFiles = ['%s/%s' % (probURL,group.file_string.iloc[0]),'%s/%s' % (hgtURL,group.file_string.iloc[0]),'%s/%s' % (sevURL,group.file_string.iloc[0]),'%s/%s' % (sldURL,group.file_string.iloc[0]),'%s/%s' % (sevscenURL,group.file_string.iloc[0]),'%s/%s' % (spcpURL,group.file_string.iloc[0]),'%s/%s' % (vvelURL,group.file_string.iloc[0]),'%s/%s' % (rhURL,group.file_string.iloc[0]),'%s/%s' % (tmpURL,group.file_string.iloc[0]),'%s/%s' % (slwURL,group.file_string.iloc[0]),'%s/%s' % (icecURL,group.file_string.iloc[0]),'%s/%s' % (liqcURL,group.file_string.iloc[0])]
+  ncFiles = ['%s/%s' % (probURL,group.mfile_string.iloc[0]),'%s/%s' % (hgtURL,group.mfile_string.iloc[0]),'%s/%s' % (sevURL,group.mfile_string.iloc[0]),'%s/%s' % (sldURL,group.mfile_string.iloc[0]),'%s/%s' % (sevscenURL,group.mfile_string.iloc[0]),'%s/%s' % (spcpURL,group.mfile_string.iloc[0]),'%s/%s' % (vvelURL,group.mfile_string.iloc[0]),'%s/%s' % (rhURL,group.mfile_string.iloc[0]),'%s/%s' % (tmpURL,group.mfile_string.iloc[0]),'%s/%s' % (slwURL,group.mfile_string.iloc[0]),'%s/%s' % (icecURL,group.mfile_string.iloc[0]),'%s/%s' % (liqcURL,group.mfile_string.iloc[0])]
   ncData = xr.open_mfdataset(ncFiles,chunks=chunks,combine='by_coords')
   print(ncData)
   
@@ -196,7 +198,7 @@ for name, group in groups:
 
     # Store input info in the output dataframe
     vxData['id'][vxcnt] = group.id.iloc[icnt]
-    vxData['file_string'][vxcnt] = group.file_string.iloc[icnt]
+    vxData['file_string'][vxcnt] = group.mfile_string.iloc[icnt]
 
     # Print info
     print("")

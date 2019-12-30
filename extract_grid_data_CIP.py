@@ -59,7 +59,7 @@ bubble = 1000
 dz = 25
 
 # Column names in CSV file
-colNames = ['id','unixObs','lat','lon','flvl','temp','ibase1','itop1','iint1','ityp1','ibase2','itop2','iint2','ityp2','acft','rawOb','unixFcst','forecast','minI','maxI','minJ','maxJ','homeI','homeJ','corner','npts','file_string']
+colNames = ['id','unixObs','lat','lon','flvl','temp','ibase1','itop1','iint1','ityp1','ibase2','itop2','iint2','ityp2','acft','rawOb','unixFcst','forecast','minI','maxI','minJ','maxJ','homeI','homeJ','corner','npts','mfile_string','file_string']
 
 # Threshold for probability to use for scoring
 probthresh = 0.05 # (5%)

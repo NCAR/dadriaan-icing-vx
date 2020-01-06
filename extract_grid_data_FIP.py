@@ -15,24 +15,24 @@ import subprocess, os, time
 # 1. Spot check in NCL
 
 # Model string
-#mstring = "num25_hrrr"
-#mid = "hrrr"
-mstring = "num4_rap"
-mid = "rap"
+mstring = "num25_hrrr"
+mid = "hrrr"
+#mstring = "num4_rap"
+#mid = "rap"
 
 # Define chunks. Try to keep chunks ~ 1M pts
 # Higher numbers = smaller chunks, lower numbers = bigger chunks
-#chunks = {'y0':158,'x0':158} # HRRR (40x1059x1799), chunk = (40x158x158)
-chunks = {'y0':160,'x0':160} # RAP (39x337x451), chunk = (39x160x160)
+chunks = {'y0':158,'x0':158} # HRRR (40x1059x1799), chunk = (40x158x158)
+#chunks = {'y0':160,'x0':160} # RAP (39x337x451), chunk = (39x160x160)
 #chunks = {'y0':225,'x0':225}
 
 # File with PIREP, matching model, and location info
 #matchfile = "/home/dadriaan/projects/sae2019/data/match/hrrr/PIREPShrrr21600posneg.out"
 #matchfile = "/home/dadriaan/projects/sae2019/data/match/hrrr/PIREPShrrr10800posneg.out"
 #matchfile = "/home/dadriaan/projects/sae2019/data/match/rap/PIREPSrap21600posneg.out"
-matchfile = "/home/dadriaan/projects/sae2019/data/match/rap/PIREPSrap10800posneg.out"
-#matchfile = "/home/dadriaan/projects/sae2019/data/match/rap/pirepTest.out"
-#matchfile = "/home/dadriaan/projects/sae2019/data/match/hrrr/pirepTest.out"
+#matchfile = "/home/dadriaan/projects/sae2019/data/match/rap/PIREPSrap10800posneg.out"
+#matchfile = "/home/dadriaan/projects/sae2019/data/match/rap/pirepFIPTest.out"
+matchfile = "/home/dadriaan/projects/sae2019/data/match/hrrr/pirepFIPTest.out"
 
 # Variable URL's
 probURL = "/var/autofs/mnt/ahmose_d1/dadriaan/projects/sae2019/data/"+mstring+"/data/netcdf/fip/pressure/conus_ICE_PROB"
@@ -47,6 +47,12 @@ tmpURL = "/var/autofs/mnt/ahmose_d1/dadriaan/projects/sae2019/data/"+mstring+"/d
 vvelURL = "/var/autofs/mnt/ahmose_d1/dadriaan/projects/sae2019/data/"+mstring+"/data/netcdf/model/"+mid+"/pressure_derived/conus_VVEL"
 liqcURL = "/var/autofs/mnt/ahmose_d1/dadriaan/projects/sae2019/data/"+mstring+"/data/netcdf/model/"+mid+"/pressure_derived/conus_LIQ_COND"
 icecURL = "/var/autofs/mnt/ahmose_d1/dadriaan/projects/sae2019/data/"+mstring+"/data/netcdf/model/"+mid+"/pressure_derived/conus_ICE_COND"
+
+# List of URL's to include
+urls = [probURL,sevURL,sldURL,hgtURL]
+
+# List of files to open
+ncFiles = []
 
 # Height offset to expand PIREP top/base. If this is zero, then the code works differently.
 zOff = 0
@@ -76,10 +82,13 @@ vxCols = ['id','file_string','probFYOY','probFNON','probFNOY','probFYON','sevFYO
 DEBUG = True
 
 # Boolens for processing.
-vNear = True
-vMean = True
-vMed = True
-vStdev = True
+vNear = False  # Nearest NWP data
+vMean = False # Mean NWP data
+vMed = False   # Median NWP data
+vStdev = False # StDev NWP data
+vScen = False # Scenario processing (and SURF_PRECIP)
+vNWP = False  # NWP processing
+vFIP = True   # FIP processing
 
 # Number of seconds in forecast lead
 nsecfcst = 10800
@@ -87,10 +96,10 @@ nsecfcst = 10800
 # Output dataframe
 #outfile = "/home/dadriaan/projects/sae2019/icing-vx/hrrr10800vx.csv"
 #outfile = "/home/dadriaan/projects/sae2019/icing-vx/hrrr21600vx.csv"
-outfile = "/home/dadriaan/projects/sae2019/icing-vx/rap10800vx.csv"
+#outfile = "/home/dadriaan/projects/sae2019/icing-vx/rap10800vx.csv"
 #outfile = "/home/dadriaan/projects/sae2019/icing-vx/rap21600vx.csv"
 #outfile = "/home/dadriaan/projects/sae2019/icing-vx/rapTestvx.csv"
-#outfile = "/home/dadriaan/projects/sae2019/icing-vx/hrrrTestvx.csv"
+outfile = "/home/dadriaan/projects/sae2019/icing-vx/hrrrTestvx.csv"
 
 ############################################################################
 
@@ -155,32 +164,52 @@ for name, group in groups:
     print((group.mfile_string.iloc[0]))
 
   # Open multiple files so we have height info
-  ncFiles = ['%s/%s' % (probURL,group.mfile_string.iloc[0]),'%s/%s' % (hgtURL,group.mfile_string.iloc[0]),'%s/%s' % (sevURL,group.mfile_string.iloc[0]),'%s/%s' % (sldURL,group.mfile_string.iloc[0]),'%s/%s' % (sevscenURL,group.mfile_string.iloc[0]),'%s/%s' % (spcpURL,group.mfile_string.iloc[0]),'%s/%s' % (vvelURL,group.mfile_string.iloc[0]),'%s/%s' % (rhURL,group.mfile_string.iloc[0]),'%s/%s' % (tmpURL,group.mfile_string.iloc[0]),'%s/%s' % (slwURL,group.mfile_string.iloc[0]),'%s/%s' % (icecURL,group.mfile_string.iloc[0]),'%s/%s' % (liqcURL,group.mfile_string.iloc[0])]
+  for u in urls:
+    ncFiles.append('%s/%s' % (u,group.mfile_string.iloc[0]))
+  #ncFiles = ['%s/%s' % (probURL,group.mfile_string.iloc[0]),\
+  #           '%s/%s' % (sevURL,group.mfile_string.iloc[0]),\
+  #           '%s/%s' % (sldURL,group.mfile_string.iloc[0]),\
+  #           '%s/%s' % (sevscenURL,group.mfile_string.iloc[0]),\
+  #           '%s/%s' % (spcpURL,group.mfile_string.iloc[0]),\
+  #           '%s/%s' % (hgtURL,group.mfile_string.iloc[0]),\
+  #           '%s/%s' % (vvelURL,group.mfile_string.iloc[0]),\
+  #           '%s/%s' % (rhURL,group.mfile_string.iloc[0]),\
+  #           '%s/%s' % (tmpURL,group.mfile_string.iloc[0]),\
+  #           '%s/%s' % (slwURL,group.mfile_string.iloc[0]),\
+  #           '%s/%s' % (icecURL,group.mfile_string.iloc[0]),\
+  #           '%s/%s' % (liqcURL,group.mfile_string.iloc[0])]
   ncData = xr.open_mfdataset(ncFiles,chunks=chunks,combine='by_coords')
   print(ncData)
   
   # Correct NA values in certain variables (do this before correcting to zero)
-  ncData['ICE_SEV'] = ncData.ICE_SEV.fillna(0.0)
-  ncData['ICE_PROB'] = ncData.ICE_PROB.fillna(0.0)
-  ncData['SLD'] = ncData.SLD.fillna(0.0)
-  ncData['SLW'] = ncData.SLW.fillna(0.0)
-  ncData['ICE_COND'] = ncData.ICE_COND.fillna(0.0)
-  ncData['LIQ_COND'] = ncData.LIQ_COND.fillna(0.0)
-  ncData['SEV_SCENARIO'] = ncData.SEV_SCENARIO.fillna(-1.0)
+  if vNWP:
+    ncData['SLW'] = ncData.SLW.fillna(0.0)
+    ncData['ICE_COND'] = ncData.ICE_COND.fillna(0.0)
+    ncData['LIQ_COND'] = ncData.LIQ_COND.fillna(0.0)
+  if vFIP:
+    ncData['ICE_SEV'] = ncData.ICE_SEV.fillna(0.0)
+    ncData['ICE_PROB'] = ncData.ICE_PROB.fillna(0.0)
+    ncData['SLD'] = ncData.SLD.fillna(0.0)
+  if vScen:
+    ncData['SEV_SCENARIO'] = ncData.SEV_SCENARIO.fillna(-1.0)
 
   # Correct any INT16 values that are <0 to 0.0, in fields that shouldn't have negative data
-  ncData['ICE_SEV'] = ncData.ICE_SEV.where(ncData.ICE_SEV>0.0,0.0)
-  ncData['ICE_PROB'] = ncData.ICE_PROB.where(ncData.ICE_PROB>0.0,0.0)
-  ncData['SLD'] = ncData.SLD.where(ncData.SLD>0.0,0.0)
-  ncData['SLW'] = ncData.SLW.where(ncData.SLW>0.0,0.0)
-  ncData['ICE_COND'] = ncData.ICE_COND.where(ncData.ICE_COND>0.0,0.0)
-  ncData['LIQ_COND'] = ncData.LIQ_COND.where(ncData.LIQ_COND>0.0,0.0)
+  if vFIP:
+    ncData['ICE_SEV'] = ncData.ICE_SEV.where(ncData.ICE_SEV>0.0,0.0)
+    ncData['ICE_PROB'] = ncData.ICE_PROB.where(ncData.ICE_PROB>0.0,0.0)
+    ncData['SLD'] = ncData.SLD.where(ncData.SLD>0.0,0.0)
+  if vNWP:
+    ncData['SLW'] = ncData.SLW.where(ncData.SLW>0.0,0.0)
+    ncData['ICE_COND'] = ncData.ICE_COND.where(ncData.ICE_COND>0.0,0.0)
+    ncData['LIQ_COND'] = ncData.LIQ_COND.where(ncData.LIQ_COND>0.0,0.0)
 
   # Back out the icing potential value
-  ncData['ICE_POT'] = ncData['ICE_PROB']/((-0.033*(nsecfcst/3600)+0.84))
+  if vFIP:
+    ncData['ICE_POT'] = ncData['ICE_PROB']/((-0.033*(nsecfcst/3600)+0.84))
 
   # Add a total condensate variable
-  ncData['TOT_COND'] = ncData['ICE_COND']+ncData['LIQ_COND']
+  if vNWP:
+    ncData['TOT_COND'] = ncData['ICE_COND']+ncData['LIQ_COND']
 
   # Loop over each item in the series
   icnt = 0
@@ -335,58 +364,61 @@ for name, group in groups:
 
     # Mins/maxes
     print("MIN/MAX")
-    vxData['probMIN'][vxcnt] = finalHood.ICE_PROB.min().values
-    vxData['probMAX'][vxcnt] = finalHood.ICE_PROB.max().values
-    vxData['sevMIN'][vxcnt] = finalHood.ICE_SEV.min(skipna=True).values
-    vxData['sevMAX'][vxcnt] = finalHood.ICE_SEV.max(skipna=True).values
-    vxData['VVELmin'][vxcnt] = finalHood.VVEL.min().values
-    vxData['VVELmax'][vxcnt] = finalHood.VVEL.max().values
-    vxData['RHmin'][vxcnt] = finalHood.RH.min().values
-    vxData['RHmax'][vxcnt] = finalHood.RH.max().values
-    vxData['TMPmin'][vxcnt] = finalHood.TMP.min().values
-    vxData['TMPmax'][vxcnt] = finalHood.TMP.max().values
-    vxData['SLWmin'][vxcnt] = finalHood.SLW.min().values
-    vxData['SLWmax'][vxcnt] = finalHood.SLW.max().values
-    vxData['ICECmin'][vxcnt] = finalHood.ICE_COND.min().values
-    vxData['ICECmax'][vxcnt] = finalHood.ICE_COND.max().values
-    vxData['LIQCmin'][vxcnt] = finalHood.LIQ_COND.min().values
-    vxData['LIQCmax'][vxcnt] = finalHood.LIQ_COND.max().values
-    vxData['TOTCmin'][vxcnt] = finalHood.TOT_COND.min().values
-    vxData['TOTCmax'][vxcnt] = finalHood.TOT_COND.max().values
-    vxData['sldMIN'][vxcnt] = finalHood.SLD.min().values
-    vxData['sldMAX'][vxcnt] = finalHood.SLD.max().values
-    vxData['potMIN'][vxcnt] = finalHood.ICE_POT.min().values
-    vxData['potMAX'][vxcnt] = finalHood.ICE_POT.max().values
+    if vFIP:
+      vxData['probMIN'][vxcnt] = finalHood.ICE_PROB.min().values
+      vxData['probMAX'][vxcnt] = finalHood.ICE_PROB.max().values
+      vxData['potMIN'][vxcnt] = finalHood.ICE_POT.min().values
+      vxData['potMAX'][vxcnt] = finalHood.ICE_POT.max().values
+      vxData['sevMIN'][vxcnt] = finalHood.ICE_SEV.min(skipna=True).values
+      vxData['sevMAX'][vxcnt] = finalHood.ICE_SEV.max(skipna=True).values
+      vxData['sldMIN'][vxcnt] = finalHood.SLD.min().values
+      vxData['sldMAX'][vxcnt] = finalHood.SLD.max().values
+    if vNWP:
+      vxData['VVELmin'][vxcnt] = finalHood.VVEL.min().values
+      vxData['VVELmax'][vxcnt] = finalHood.VVEL.max().values
+      vxData['RHmin'][vxcnt] = finalHood.RH.min().values
+      vxData['RHmax'][vxcnt] = finalHood.RH.max().values
+      vxData['TMPmin'][vxcnt] = finalHood.TMP.min().values
+      vxData['TMPmax'][vxcnt] = finalHood.TMP.max().values
+      vxData['SLWmin'][vxcnt] = finalHood.SLW.min().values
+      vxData['SLWmax'][vxcnt] = finalHood.SLW.max().values
+      vxData['ICECmin'][vxcnt] = finalHood.ICE_COND.min().values
+      vxData['ICECmax'][vxcnt] = finalHood.ICE_COND.max().values
+      vxData['LIQCmin'][vxcnt] = finalHood.LIQ_COND.min().values
+      vxData['LIQCmax'][vxcnt] = finalHood.LIQ_COND.max().values
+      vxData['TOTCmin'][vxcnt] = finalHood.TOT_COND.min().values
+      vxData['TOTCmax'][vxcnt] = finalHood.TOT_COND.max().values
     
-    # PCPnear: val
-    print("PCP")
-    vxData['PCPnear'][vxcnt] = ncData.SURF_PRECIP.isel(time=[0],z0=[-1],y0=group.homeJ.iloc[icnt],x0=group.homeI.iloc[icnt]).values.flatten()[0]
+    if vScen:
+      # PCPnear: val
+      print("PCP")
+      vxData['PCPnear'][vxcnt] = ncData.SURF_PRECIP.isel(time=[0],z0=[-1],y0=group.homeJ.iloc[icnt],x0=group.homeI.iloc[icnt]).values.flatten()[0]
     
-    # PCPuni/PCPmode:
-    if min(regionDS.SURF_PRECIP.isel(z0=[-1]).values.flatten()) == max(regionDS.SURF_PRECIP.isel(z0=[-1]).values.flatten()):
-      vxData['PCPuni'][vxcnt] = True
-      vxData['PCPmode'][vxcnt] = regionDS.SURF_PRECIP.min().round().values
-    else:
-      vxData['PCPuni'][vxcnt] = False
-      #print(np.unique(regionDS.SURF_PRECIP.isel(z0=[-1]).values.flatten().round()))
-      vxData['PCPs'][vxcnt] = np.unique(regionDS.SURF_PRECIP.isel(z0=[-1]).values.flatten().round())
-      vxData['PCPmode'][vxcnt] = stats.mode(regionDS.SURF_PRECIP.isel(z0=[-1]).values.flatten())[0][0]
-    
-    # SCENnear: val
-    print("SCEN")
-    vxData['SCENnear'][vxcnt] = nearestFinal.SEV_SCENARIO.values.flatten().round()[0]
-    
-    # SCENuni/SCENmode:
-    # Since SEV_SCENARIO is initialized to NaN, the entire neighborhood could be NaN. Leave the SCENuni set to NaN if so.
-    if not xr.ufuncs.isnan(finalHood.SEV_SCENARIO.values.flatten().round()).all():
-      if min(finalHood.SEV_SCENARIO.values.flatten()).round() == max(finalHood.SEV_SCENARIO.values.flatten()).round():
-        vxData['SCENuni'][vxcnt] = True
-        vxData['SCENmode'][vxcnt] = finalHood.SEV_SCENARIO.min().round().values
+      # PCPuni/PCPmode:
+      if min(regionDS.SURF_PRECIP.isel(z0=[-1]).values.flatten()) == max(regionDS.SURF_PRECIP.isel(z0=[-1]).values.flatten()):
+        vxData['PCPuni'][vxcnt] = True
+        vxData['PCPmode'][vxcnt] = regionDS.SURF_PRECIP.min().round().values
       else:
-        vxData['SCENuni'][vxcnt] = False
-        #print(np.unique(finalHood.SEV_SCENARIO.values.flatten().round()))
-        vxData['SCENs'][vxcnt] = np.unique(finalHood.SEV_SCENARIO.values.flatten().round())
-        vxData['SCENmode'][vxcnt] = stats.mode(finalHood.SEV_SCENARIO.values.flatten())[0].round()[0]
+        vxData['PCPuni'][vxcnt] = False
+        #print(np.unique(regionDS.SURF_PRECIP.isel(z0=[-1]).values.flatten().round()))
+        vxData['PCPs'][vxcnt] = np.unique(regionDS.SURF_PRECIP.isel(z0=[-1]).values.flatten().round())
+        vxData['PCPmode'][vxcnt] = stats.mode(regionDS.SURF_PRECIP.isel(z0=[-1]).values.flatten())[0][0]
+    
+      # SCENnear: val
+      print("SCEN")
+      vxData['SCENnear'][vxcnt] = nearestFinal.SEV_SCENARIO.values.flatten().round()[0]
+    
+      # SCENuni/SCENmode:
+      # Since SEV_SCENARIO is initialized to NaN, the entire neighborhood could be NaN. Leave the SCENuni set to NaN if so.
+      if not xr.ufuncs.isnan(finalHood.SEV_SCENARIO.values.flatten().round()).all():
+        if min(finalHood.SEV_SCENARIO.values.flatten()).round() == max(finalHood.SEV_SCENARIO.values.flatten()).round():
+          vxData['SCENuni'][vxcnt] = True
+          vxData['SCENmode'][vxcnt] = finalHood.SEV_SCENARIO.min().round().values
+        else:
+          vxData['SCENuni'][vxcnt] = False
+          #print(np.unique(finalHood.SEV_SCENARIO.values.flatten().round()))
+          vxData['SCENs'][vxcnt] = np.unique(finalHood.SEV_SCENARIO.values.flatten().round())
+          vxData['SCENmode'][vxcnt] = stats.mode(finalHood.SEV_SCENARIO.values.flatten())[0].round()[0]
     
     # nPtsHood: Number of total non-NaN points in the finalHood
     print("NPTS")

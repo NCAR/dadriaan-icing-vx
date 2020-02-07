@@ -158,7 +158,6 @@ for name, group in groups:
   #           '%s/%s' % (liqcURL,group.mfile_string.iloc[0])]
   print("")
   print("LOADING DATA")
-  print(ncFiles)
   #ncData = xr.open_mfdataset(ncFiles,chunks=chunks,combine='by_coords',parallel=True)
   ncData = xr.open_mfdataset(ncFiles,chunks=chunks,combine='by_coords')
   #print(ncData)

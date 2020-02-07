@@ -226,4 +226,15 @@ nsecfcst = 10800
 #
 outfile = "tmp.csv"
 
+####### infile #######
+#
+# NAME: infile
+# OPTIONS:
+# TYPE: string
+# FORMAT:
+# DEFAULT: "tmp.in"
+# DESCRIPTION: Full path to the input CSV file. Should be called "tmp.in"
+#
+infile = "tmp.in" 
+
 """

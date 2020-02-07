@@ -12,7 +12,7 @@ for l in data:
   fout.write('%s' % (l))
   fout.close()
 
-  cmd = "python /home/dadriaan/projects/sae2019/icing-vx/extract_grid_data_CIP.py %s" % ("/home/dadriaan/projects/sae2019/icing-vx/tmp.in")
+  cmd = "python /home/dadriaan/projects/sae2019/icing-vx/extract_grid_data_CIP.py -c /home/dadriaan/projects/sae2019/icing-vx/test_CIP_khaba_params.py -infile %s" % ("/home/dadriaan/projects/sae2019/icing-vx/tmp.in")
   print(cmd)
   os.system(cmd)
 

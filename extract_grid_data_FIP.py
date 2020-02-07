@@ -9,97 +9,75 @@ import numpy as np
 from scipy import stats
 import subprocess, os, time
 
+# Import params
+from extract_params import Params
+p = Params()
+p.init()
+
 ############################# User Config #################################
 
-# TODO:
-# 1. Spot check in NCL
+# Debug flag
+DEBUG = p.opt['debug']
+
+# Boolens for processing.
+vNear = p.opt['vNear']   # Nearest NWP data
+vMean = p.opt['vMean']   # Mean NWP data 
+vMed = p.opt['vMed']     # Median NWP data
+vStdev = p.opt['vStdev'] # StDev NWP data
+vScen = p.opt['vScen']   # Scenario processing
+vNWP = p.opt['vNWP']     # NWP processing
+vAlgo = p.opt['vAlgo']   # FIP processing
 
 # Model string
-mstring = "num25_hrrr"
-mid = "hrrr"
-#mstring = "num4_rap"
-#mid = "rap"
+mstring = p.opt['mstring']
+mid = p.opt['m_id']
 
 # Define chunks. Try to keep chunks ~ 1M pts
 # Higher numbers = smaller chunks, lower numbers = bigger chunks
-chunks = {'y0':158,'x0':158} # HRRR (40x1059x1799), chunk = (40x158x158)
-#chunks = {'y0':160,'x0':160} # RAP (39x337x451), chunk = (39x160x160)
-#chunks = {'y0':225,'x0':225}
+# HRRR_prs (40x1059x1799), chunk = 40x158x158
+# RAP_prs (39x337x451), chunk = 39x160x160
+chunks = {'y0':p.opt['ychunks'],'x0':p.opt['xchunks']}
 
 # File with PIREP, matching model, and location info
-#matchfile = "/home/dadriaan/projects/sae2019/data/match/hrrr/PIREPShrrr21600posneg.out"
-#matchfile = "/home/dadriaan/projects/sae2019/data/match/hrrr/PIREPShrrr10800posneg.out"
-#matchfile = "/home/dadriaan/projects/sae2019/data/match/rap/PIREPSrap21600posneg.out"
-#matchfile = "/home/dadriaan/projects/sae2019/data/match/rap/PIREPSrap10800posneg.out"
-#matchfile = "/home/dadriaan/projects/sae2019/data/match/rap/pirepFIPTest.out"
-matchfile = "/home/dadriaan/projects/sae2019/data/match/hrrr/pirepFIPTest.out"
+matchfile = p.opt['infile']
 
-# Variable URL's
-probURL = "/var/autofs/mnt/ahmose_d1/dadriaan/projects/sae2019/data/"+mstring+"/data/netcdf/fip/pressure/conus_ICE_PROB"
-sevURL = "/var/autofs/mnt/ahmose_d1/dadriaan/projects/sae2019/data/"+mstring+"/data/netcdf/fip/pressure/conus_ICE_SEV"
-sldURL = "/var/autofs/mnt/ahmose_d1/dadriaan/projects/sae2019/data/"+mstring+"/data/netcdf/fip/pressure/conus_SLD"
-sevscenURL = "/var/autofs/mnt/ahmose_d1/dadriaan/projects/sae2019/data/"+mstring+"/data/netcdf/fip/diagnostic/conus_SEV_SCENARIO"
-spcpURL = "/var/autofs/mnt/ahmose_d1/dadriaan/projects/sae2019/data/"+mstring+"/data/netcdf/fip/diagnostic/conus_SURF_PRECIP"
-hgtURL = "/var/autofs/mnt/ahmose_d1/dadriaan/projects/sae2019/data/"+mstring+"/data/netcdf/model/"+mid+"/pressure_derived/conus_HGT"
-rhURL = "/var/autofs/mnt/ahmose_d1/dadriaan/projects/sae2019/data/"+mstring+"/data/netcdf/model/"+mid+"/pressure_derived/conus_RH"
-slwURL = "/var/autofs/mnt/ahmose_d1/dadriaan/projects/sae2019/data/"+mstring+"/data/netcdf/model/"+mid+"/pressure_derived/conus_SLW"
-tmpURL = "/var/autofs/mnt/ahmose_d1/dadriaan/projects/sae2019/data/"+mstring+"/data/netcdf/model/"+mid+"/pressure_derived/conus_TMP"
-vvelURL = "/var/autofs/mnt/ahmose_d1/dadriaan/projects/sae2019/data/"+mstring+"/data/netcdf/model/"+mid+"/pressure_derived/conus_VVEL"
-liqcURL = "/var/autofs/mnt/ahmose_d1/dadriaan/projects/sae2019/data/"+mstring+"/data/netcdf/model/"+mid+"/pressure_derived/conus_LIQ_COND"
-icecURL = "/var/autofs/mnt/ahmose_d1/dadriaan/projects/sae2019/data/"+mstring+"/data/netcdf/model/"+mid+"/pressure_derived/conus_ICE_COND"
+# List to hold URL's
+urls = []
 
-# List of URL's to include
-urls = [probURL,sevURL,sldURL,hgtURL]
+# Fill up lists
+if vAlgo:
+  for v in p.opt['avars']:
+    if v in ['ICE_PROB','ICE_SEV','SLD']:
+      urls.append(os.path.join(p.opt['url_pref'],mstring,'data/netcdf/fip/pressure/conus_%s' % (v)))
+    if v in ['SEV_SCENARIO','SLD_SCENARIO','POT_SCENARIO','SURF_PRECIP','ICE']:
+      urls.append(os.path.join(p.opt['url_pref'],mstring,'data/netcdf/fip/diagnostic/conus_%s' % (v)))
+if vNWP:
+  for v in p.opt['mvars']:
+    if v not in ['HGT']:
+      urls.append(os.path.join(p.opt['url_pref'],mstring,'data/netcdf/model',mid,'pressure_derived/conus_%s' % (v)))
+# Always load HGT
+urls.append(os.path.join(p.opt['url_pref'],mstring,'data/netcdf/model',mid,'pressure_derived/conus_HGT'))
 
-# List of files to open
+# List of netCDF files to open
 ncFiles = []
 
-# Height offset to expand PIREP top/base. If this is zero, then the code works differently.
-zOff = 0
-
 # If zOff = 0, use this bubble to search for points around the PIREP within 1000 ft
-bubble = 1000
+bubble = p.opt['bubble']
 
 # What's the dz of the dataset (if not constant altitude)?
-dz = 25
+dz = p.opt['dz']
 
 # Column names in CSV file
 colNames = ['id','unixObs','lat','lon','flvl','temp','ibase1','itop1','iint1','ityp1','ibase2','itop2','iint2','ityp2','acft','rawOb','unixFcst','forecast','minI','maxI','minJ','maxJ','homeI','homeJ','corner','npts','mfile_string','file_string']
 
-# Threshold for probability to use for scoring
-probthresh = 0.05 # (5%)
-
-# Threshold for probability when scoring severity
-probsevthresh = 0.05 # (5%)
-
-# Threshold for scoring SLW
-slwthresh = 1.0e-6
-
 # Column names for dataframe of results that will be appended to the dataframe of the input data
-vxCols = ['id','file_string','probFYOY','probFNON','probFNOY','probFYON','sevFYOY','sevFNON','sevFNOY','sevFYON','VVELnear','VVELmean','VVELmed','VVELstdev','RHnear','RHmean','RHmed','RHstdev','SLWnear','SLWmean','SLWmed','SLWstdev','TMPnear','TMPmean','TMPmed','TMPstdev','PCPnear','PCPmode','PCPuni','PCPs','SCENnear','SCENmode','SCENuni','SCENs','nPtsHood','nLevHood','nPtsStats','isMulti','levNear','zNear','badPirep','slwFYOY','slwFYON','slwFNOY','slwFNON','probMIN','probMAX','sevMIN','sevMAX','VVELmin','VVELmax','RHmin','RHmax','TMPmin','TMPmax','SLWmin','SLWmax','ICECmin','ICECmax','LIQCmin','LIQCmax','TOTCmin','TOTCmax','potMIN','potMAX','sldMIN','sldMAX']
-
-# Debug flag
-DEBUG = True
-
-# Boolens for processing.
-vNear = False  # Nearest NWP data
-vMean = False # Mean NWP data
-vMed = False   # Median NWP data
-vStdev = False # StDev NWP data
-vScen = False # Scenario processing (and SURF_PRECIP)
-vNWP = False  # NWP processing
-vFIP = True   # FIP processing
+vxCols = ['id','file_string','probFYOY','probFNON','probFNOY','probFYON','sevFYOY','sevFNON','sevFNOY','sevFYON','VVELnear','VVELmean','VVELmed','VVELstdev','RHnear','RHmean','RHmed','RHstdev','SLWnear','SLWmean','SLWmed','SLWstdev','TMPnear','TMPmean','TMPmed','TMPstdev','PCPnear','PCPmode','PCPuni','PCPs','SCENnear','SCENmode','SCENuni','SCENs','nPtsHood','nLevHood','nPtsStats','isMulti','levNear','zNear','badPirep','slwFYOY','slwFYON','slwFNOY','slwFNON','probMIN','probMAX','sevMIN','sevMAX','VVELmin','VVELmax','RHmin','RHmax','TMPmin','TMPmax','SLWmin','SLWmax','ICECmin','ICECmax','LIQCmin','LIQCmax','TOTCmin','TOTCmax','potMIN','potMAX','sldMIN','sldMAX','zBot','zTop']
 
 # Number of seconds in forecast lead
 nsecfcst = 10800
 
 # Output dataframe
-#outfile = "/home/dadriaan/projects/sae2019/icing-vx/hrrr10800vx.csv"
-#outfile = "/home/dadriaan/projects/sae2019/icing-vx/hrrr21600vx.csv"
-#outfile = "/home/dadriaan/projects/sae2019/icing-vx/rap10800vx.csv"
-#outfile = "/home/dadriaan/projects/sae2019/icing-vx/rap21600vx.csv"
-#outfile = "/home/dadriaan/projects/sae2019/icing-vx/rapTestvx.csv"
-outfile = "/home/dadriaan/projects/sae2019/icing-vx/hrrrTestvx.csv"
+outfile = p.opt['outfile']
 
 ############################################################################
 
@@ -178,15 +156,19 @@ for name, group in groups:
   #           '%s/%s' % (slwURL,group.mfile_string.iloc[0]),\
   #           '%s/%s' % (icecURL,group.mfile_string.iloc[0]),\
   #           '%s/%s' % (liqcURL,group.mfile_string.iloc[0])]
+  print("")
+  print("LOADING DATA")
+  print(ncFiles)
+  #ncData = xr.open_mfdataset(ncFiles,chunks=chunks,combine='by_coords',parallel=True)
   ncData = xr.open_mfdataset(ncFiles,chunks=chunks,combine='by_coords')
-  print(ncData)
+  #print(ncData)
   
   # Correct NA values in certain variables (do this before correcting to zero)
   if vNWP:
     ncData['SLW'] = ncData.SLW.fillna(0.0)
     ncData['ICE_COND'] = ncData.ICE_COND.fillna(0.0)
     ncData['LIQ_COND'] = ncData.LIQ_COND.fillna(0.0)
-  if vFIP:
+  if vAlgo:
     ncData['ICE_SEV'] = ncData.ICE_SEV.fillna(0.0)
     ncData['ICE_PROB'] = ncData.ICE_PROB.fillna(0.0)
     ncData['SLD'] = ncData.SLD.fillna(0.0)
@@ -194,7 +176,7 @@ for name, group in groups:
     ncData['SEV_SCENARIO'] = ncData.SEV_SCENARIO.fillna(-1.0)
 
   # Correct any INT16 values that are <0 to 0.0, in fields that shouldn't have negative data
-  if vFIP:
+  if vAlgo:
     ncData['ICE_SEV'] = ncData.ICE_SEV.where(ncData.ICE_SEV>0.0,0.0)
     ncData['ICE_PROB'] = ncData.ICE_PROB.where(ncData.ICE_PROB>0.0,0.0)
     ncData['SLD'] = ncData.SLD.where(ncData.SLD>0.0,0.0)
@@ -204,7 +186,7 @@ for name, group in groups:
     ncData['LIQ_COND'] = ncData.LIQ_COND.where(ncData.LIQ_COND>0.0,0.0)
 
   # Back out the icing potential value
-  if vFIP:
+  if vAlgo:
     ncData['ICE_POT'] = ncData['ICE_PROB']/((-0.033*(nsecfcst/3600)+0.84))
 
   # Add a total condensate variable
@@ -364,7 +346,7 @@ for name, group in groups:
 
     # Mins/maxes
     print("MIN/MAX")
-    if vFIP:
+    if vAlgo:
       vxData['probMIN'][vxcnt] = finalHood.ICE_PROB.min().values
       vxData['probMAX'][vxcnt] = finalHood.ICE_PROB.max().values
       vxData['potMIN'][vxcnt] = finalHood.ICE_POT.min().values
@@ -430,10 +412,14 @@ for name, group in groups:
     # nPtsStats: Number of valid points in the neighborhood within 1000ft of PIREP
     #            This is total number of points minus all missing (NaN) points
     vxData['nPtsStats'][vxcnt] = vxData['nPtsHood'][vxcnt]-xr.ufuncs.isnan(finalHood.HGT).sum(dim='z0').sum().values
+   
+    # Store the upper and lower index into the Z coordinate where data were selected
+    vxData['zBot'][vxcnt] = regionDS.get_index('z0').get_loc(regionDS.sel(z0=finalHood.z0.values[0]).z0.values.ravel()[0])
+    vxData['zTop'][vxcnt] = regionDS.get_index('z0').get_loc(regionDS.sel(z0=finalHood.z0.values[-1]).z0.values.ravel()[0])
 
     # Print out a row of the dataframe to see all the data we've collected for this PIREP
     print("")
-    print((vxData.loc[[vxcnt]]))
+    #print((vxData.loc[[vxcnt]]))
 
     # Exit after one PIREP
     #sys.exit(0)
@@ -466,7 +452,7 @@ for name, group in groups:
   if os.path.exists(outfile):
     vxInput = pd.read_csv(outfile)
     vxInput = vxInput.append(vxData,ignore_index=True)
-    print(vxInput)
+    #print(vxInput)
     vxInput.to_csv(outfile,index=False,na_rep="NaN")
   else:
     vxData.to_csv(outfile,index=False,na_rep="NaN") 

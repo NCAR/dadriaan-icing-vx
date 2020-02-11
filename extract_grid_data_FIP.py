@@ -8,6 +8,13 @@ import statistics as stat
 import numpy as np
 from scipy import stats
 import subprocess, os, time
+import time
+
+# Add current path
+sys.path.append('.')
+
+# Import icing funcs
+import icing_funcs as icing
 
 # Import params
 from extract_params import Params
@@ -18,6 +25,10 @@ p.init()
 
 # Debug flag
 DEBUG = p.opt['debug']
+
+# What file format?
+#ff = "mdv" # MDV
+ff = "netcdf"
 
 # Boolens for processing.
 vNear = p.opt['vNear']   # Nearest NWP data
@@ -36,7 +47,15 @@ mid = p.opt['m_id']
 # Higher numbers = smaller chunks, lower numbers = bigger chunks
 # HRRR_prs (40x1059x1799), chunk = 40x158x158
 # RAP_prs (39x337x451), chunk = 39x160x160
-chunks = {'y0':p.opt['ychunks'],'x0':p.opt['xchunks']}
+if ff=="mdv":
+  chunks = {'y':p.opt['ychunks'],'x':p.opt['xchunks']}
+elif ff=="netcdf":
+  chunks = {'y0':p.opt['ychunks'],'x0':p.opt['xchunks']}
+else:
+  print("")
+  print("UNKNOWN FILE FORMAT.")
+  sys.exit(1)
+
 
 # File with PIREP, matching model, and location info
 matchfile = p.opt['infile']
@@ -48,15 +67,15 @@ urls = []
 if vAlgo:
   for v in p.opt['avars']:
     if v in ['ICE_PROB','ICE_SEV','SLD']:
-      urls.append(os.path.join(p.opt['url_pref'],mstring,'data/netcdf/fip/pressure/conus_%s' % (v)))
+      urls.append(os.path.join(p.opt['url_pref'],mstring,'data/%s/fip/pressure/conus_%s' % (ff,v)))
     if v in ['SEV_SCENARIO','SLD_SCENARIO','POT_SCENARIO','SURF_PRECIP','ICE']:
-      urls.append(os.path.join(p.opt['url_pref'],mstring,'data/netcdf/fip/diagnostic/conus_%s' % (v)))
+      urls.append(os.path.join(p.opt['url_pref'],mstring,'data/%s/fip/diagnostic/conus_%s' % (ff,v)))
 if vNWP:
   for v in p.opt['mvars']:
     if v not in ['HGT']:
-      urls.append(os.path.join(p.opt['url_pref'],mstring,'data/netcdf/model',mid,'pressure_derived/conus_%s' % (v)))
+      urls.append(os.path.join(p.opt['url_pref'],mstring,'data/%s/model',mid,'pressure_derived/conus_%s' % (ff,v)))
 # Always load HGT
-urls.append(os.path.join(p.opt['url_pref'],mstring,'data/netcdf/model',mid,'pressure_derived/conus_HGT'))
+urls.append(os.path.join(p.opt['url_pref'],mstring,'data/%s/model' % (ff),mid,'pressure_derived/conus_HGT'))
 
 # List of netCDF files to open
 ncFiles = []
@@ -141,26 +160,24 @@ for name, group in groups:
     print("PROCESSING MODEL FILE:")
     print((group.mfile_string.iloc[0]))
 
-  # Open multiple files so we have height info
-  for u in urls:
-    ncFiles.append('%s/%s' % (u,group.mfile_string.iloc[0]))
-  #ncFiles = ['%s/%s' % (probURL,group.mfile_string.iloc[0]),\
-  #           '%s/%s' % (sevURL,group.mfile_string.iloc[0]),\
-  #           '%s/%s' % (sldURL,group.mfile_string.iloc[0]),\
-  #           '%s/%s' % (sevscenURL,group.mfile_string.iloc[0]),\
-  #           '%s/%s' % (spcpURL,group.mfile_string.iloc[0]),\
-  #           '%s/%s' % (hgtURL,group.mfile_string.iloc[0]),\
-  #           '%s/%s' % (vvelURL,group.mfile_string.iloc[0]),\
-  #           '%s/%s' % (rhURL,group.mfile_string.iloc[0]),\
-  #           '%s/%s' % (tmpURL,group.mfile_string.iloc[0]),\
-  #           '%s/%s' % (slwURL,group.mfile_string.iloc[0]),\
-  #           '%s/%s' % (icecURL,group.mfile_string.iloc[0]),\
-  #           '%s/%s' % (liqcURL,group.mfile_string.iloc[0])]
+  # Open multiple files based on file format
   print("")
   print("LOADING DATA")
-  #ncData = xr.open_mfdataset(ncFiles,chunks=chunks,combine='by_coords',parallel=True)
-  ncData = xr.open_mfdataset(ncFiles,chunks=chunks,combine='by_coords')
-  #print(ncData)
+  if ff=="mdv":
+    for u in urls:
+      ncFiles.append('%s/%s' % (u,group.mfile_string.iloc[0].replace(".nc",".mdv")))
+    ncData = icing.load_mdv_dataset(ncFiles,True)
+    ncData.chunk(chunks=chunks)
+  elif ff=="netcdf":
+    for u in urls:
+      ncFiles.append('%s/%s' % (u,group.mfile_string.iloc[0]))
+    #ncData = xr.open_mfdataset(ncFiles,chunks=chunks,combine='by_coords',parallel=True)
+    ncData = xr.open_mfdataset(ncFiles,chunks=chunks,combine='by_coords')
+  else:
+    print("")
+    print("UNKNOWN FILE FORMAT.")
+    sys.exit(1)
+  exit()
   
   # Correct NA values in certain variables (do this before correcting to zero)
   if vNWP:

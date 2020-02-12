@@ -9,6 +9,12 @@ import numpy as np
 from scipy import stats
 import subprocess, os, time
 
+# Add current path
+sys.path.append('.')
+
+# Import icing funcs
+import icing_funcs as icing
+
 # Import params
 from extract_params import Params
 p = Params()
@@ -18,6 +24,10 @@ p.init()
 
 # Debug flag
 DEBUG = p.opt['debug']
+
+# What file format?
+# Supported options are MDV or NETCDF
+ff = p.opt['file_format']
 
 # Boolens for processing.
 vNear = p.opt['vNear']   # Nearest NWP data
@@ -36,7 +46,14 @@ mid = p.opt['m_id']
 # Higher numbers = smaller chunks, lower numbers = bigger chunks
 # HRRR_prs (40x1059x1799), chunk = 40x158x158
 # RAP_prs (39x337x451), chunk = 39x160x160
-chunks = {'y0':p.opt['ychunks'],'x0':p.opt['xchunks']}
+if ff=="mdv":
+  chunks = {'y':p.opt['ychunks'],'x':p.opt['xchunks']}
+elif ff=="netcdf":
+  chunks = {'y0':p.opt['ychunks'],'x0':p.opt['xchunks']}
+else:
+  print("")
+  print("UNKNOWN FILE FORMAT.")
+  sys.exit(1)
 
 # File with PIREP, matching model, and location info
 matchfile = p.opt['infile']
@@ -51,15 +68,15 @@ murls = []
 if vAlgo:
   for v in p.opt['avars']:
     if v in ['ICE_PROB','ICE_SEV','SLD']:
-      aurls.append(os.path.join(p.opt['url_pref'],mstring,'data/netcdf/cip/pressure/conus_%s' % (v)))
+      aurls.append(os.path.join(p.opt['aurl_pref'],mstring,'data/%s/cip/pressure/conus_%s' % (ff,v)))
     if v in ['SEV_SCENARIO','SLD_SCENARIO','POT_SCENARIO']:
-      aurls.append(os.path.join(p.opt['url_pref'],mstring,'data/netcdf/cip/diagnostic/conus_%s' % (v)))
+      aurls.append(os.path.join(p.opt['aurl_pref'],mstring,'data/%s/cip/diagnostic/conus_%s' % (ff,v)))
 if vNWP:
   for v in p.opt['mvars']:
     if v not in ['HGT']:
-      murls.append(os.path.join(p.opt['url_pref'],mstring,'data/netcdf/model',mid,'pressure_derived/conus_%s' % (v)))
+      murls.append(os.path.join(p.opt['murl_pref'],mstring,'data/%s/model',mid,'pressure_derived/conus_%s' % (ff,v)))
 # Always load HGT      
-murls.append(os.path.join(p.opt['url_pref'],mstring,'data/netcdf/model',mid,'pressure_derived/conus_HGT'))
+murls.append(os.path.join(p.opt['murl_pref'],mstring,'data/%s/model' % (ff),mid,'pressure_derived/conus_HGT'))
 
 # List of netCDF files to open
 ncFiles = []
@@ -142,28 +159,31 @@ for name, group in groups:
     print((group.file_string.iloc[0]))
 
   # Open multiple files so we have height info
-  for u in aurls:
-    ncFiles.append('%s/%s' % (u,group.file_string.iloc[0]))
-  for u in murls:
-    ncFiles.append('%s/%s' % (u,group.mfile_string.iloc[0]))
-  #ncFiles = ['%s/%s' % (probURL,group.file_string.iloc[0]),\
-  #           '%s/%s' % (sevURL,group.file_string.iloc[0]),\
-  #           '%s/%s' % (sldURL,group.file_string.iloc[0]),\
-  #           '%s/%s' % (sevscenURL,group.file_string.iloc[0]),\
-  #           '%s/%s' % (potscenURL,group.file_string.iloc[0]),\
-  #           '%s/%s' % (sldscenURL,group.file_string.iloc[0]),\
-  #           '%s/%s' % (hgtURL,group.mfile_string.iloc[0]),\
-  #           '%s/%s' % (vvelURL,group.mfile_string.iloc[0]),\
-  #           '%s/%s' % (rhURL,group.mfile_string.iloc[0]),\
-  #           '%s/%s' % (tmpURL,group.mfile_string.iloc[0]),\
-  #           '%s/%s' % (slwURL,group.mfile_string.iloc[0]),\
-  #           '%s/%s' % (icecURL,group.mfile_string.iloc[0]),\
-  #           '%s/%s' % (liqcURL,group.mfile_string.iloc[0])]
   print("")
   print("LOADING DATA")
-  #ncData = xr.open_mfdataset(ncFiles,chunks=chunks,combine='by_coords',compat='override')
-  ncData = xr.open_mfdataset(ncFiles,chunks=chunks,combine='by_coords')
-  #print(ncData)
+  if ff=="mdv":
+    # Create new filenames since they are different for MDV
+    s1 = str.split(group.file_string.iloc[0],"_")
+    s2 = str.split(group.file_string.iloc[0],"/")
+    mdv_file_string = "%s/%s" % (s2[0],s1[-1])
+    for u in aurls:
+      ncFiles.append('%s/%s' % (u,mdv_file_string.replace(".nc",".mdv")))
+    for u in murls:
+      ncFiles.append('%s/%s' % (u,group.mfile_string.iloc[0].replace(".nc",".mdv")))
+    ncData = icing.load_mdv_dataset(ncFiles,True)
+    ncData.chunk(chunks=chunks)
+  elif ff=="netcdf":
+    for u in aurls:
+      ncFiles.append('%s/%s' % (u,group.file_string.iloc[0]))
+    for u in murls:
+      ncFiles.append('%s/%s' % (u,group.mfile_string.iloc[0]))
+    #ncData = xr.open_mfdataset(ncFiles,chunks=chunks,combine='by_coords',compat='override')
+    ncData = xr.open_mfdataset(ncFiles,chunks=chunks,combine='by_coords')
+  else:
+    print("")
+    print("UNKNOWN FILE FORMAT.")
+    sys.exit(1)
+  exit()
   
   # Correct NA values in certain variables (do this before correcting to zero)
   if vNWP:

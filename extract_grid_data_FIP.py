@@ -27,8 +27,8 @@ p.init()
 DEBUG = p.opt['debug']
 
 # What file format?
-#ff = "mdv" # MDV
-ff = "netcdf"
+# Supported options are MDV or NETCDF
+ff = p.opt['file_format']
 
 # Boolens for processing.
 vNear = p.opt['vNear']   # Nearest NWP data
@@ -56,7 +56,6 @@ else:
   print("UNKNOWN FILE FORMAT.")
   sys.exit(1)
 
-
 # File with PIREP, matching model, and location info
 matchfile = p.opt['infile']
 
@@ -67,15 +66,15 @@ urls = []
 if vAlgo:
   for v in p.opt['avars']:
     if v in ['ICE_PROB','ICE_SEV','SLD']:
-      urls.append(os.path.join(p.opt['url_pref'],mstring,'data/%s/fip/pressure/conus_%s' % (ff,v)))
+      urls.append(os.path.join(p.opt['aurl_pref'],mstring,'data/%s/fip/pressure/conus_%s' % (ff,v)))
     if v in ['SEV_SCENARIO','SLD_SCENARIO','POT_SCENARIO','SURF_PRECIP','ICE']:
-      urls.append(os.path.join(p.opt['url_pref'],mstring,'data/%s/fip/diagnostic/conus_%s' % (ff,v)))
+      urls.append(os.path.join(p.opt['aurl_pref'],mstring,'data/%s/fip/diagnostic/conus_%s' % (ff,v)))
 if vNWP:
   for v in p.opt['mvars']:
     if v not in ['HGT']:
-      urls.append(os.path.join(p.opt['url_pref'],mstring,'data/%s/model',mid,'pressure_derived/conus_%s' % (ff,v)))
+      urls.append(os.path.join(p.opt['murl_pref'],mstring,'data/%s/model',mid,'pressure_derived/conus_%s' % (ff,v)))
 # Always load HGT
-urls.append(os.path.join(p.opt['url_pref'],mstring,'data/%s/model' % (ff),mid,'pressure_derived/conus_HGT'))
+urls.append(os.path.join(p.opt['murl_pref'],mstring,'data/%s/model' % (ff),mid,'pressure_derived/conus_HGT'))
 
 # List of netCDF files to open
 ncFiles = []

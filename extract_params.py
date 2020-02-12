@@ -33,16 +33,27 @@ mstring = "num25_hrrr"
 #
 m_id = "hrrr"
 
-####### url_pref #######
+####### murl_pref #######
 #
 # NAME: url_pref
 # OPTIONS:
 # TYPE: string
 # FORMAT:
 # DEFAULT:
-# DESCRIPTION: Prefix for each of the URL's used for input
+# DESCRIPTION: Prefix for each of the URL's used for model data input
 #
-url_pref = ""
+murl_pref = ""
+
+###### aurl_pref ######
+#
+# NAME: aurl_pref
+# OPTIONS:
+# TYPE: string
+# FORMAT:
+# DEFAULT:
+# DESCRIPTION: Prefix for each of the URL's used for algorithm data input
+#
+aurl_pref = ""
 
 ####### ychunks #######
 #
@@ -236,5 +247,16 @@ outfile = "tmp.csv"
 # DESCRIPTION: Full path to the input CSV file. Should be called "tmp.in"
 #
 infile = "tmp.in" 
+
+####### file_format #######
+#
+# NAME: file_format
+# OPTIONS: "mdv" or "netcdf"
+# TYPE: string
+# FORMAT:
+# DEFAULT: "mdv"
+# DESCRIPTION: Specify the algorithm/model input file format
+#
+file_format = "mdv"
 
 """

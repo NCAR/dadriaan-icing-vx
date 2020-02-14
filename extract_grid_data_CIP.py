@@ -1,5 +1,10 @@
 #!/usr/local/python3/bin/python
 
+# Import params
+from extract_params import Params
+p = Params()
+p.init()
+
 # Modules
 import xarray as xr
 import pandas as pd
@@ -14,11 +19,6 @@ sys.path.append('.')
 
 # Import icing funcs
 import icing_funcs as icing
-
-# Import params
-from extract_params import Params
-p = Params()
-p.init()
 
 ############################# User Config #################################
 
@@ -183,7 +183,6 @@ for name, group in groups:
     print("")
     print("UNKNOWN FILE FORMAT.")
     sys.exit(1)
-  exit()
   
   # Correct NA values in certain variables (do this before correcting to zero)
   if vNWP:

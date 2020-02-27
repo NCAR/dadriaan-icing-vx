@@ -34,6 +34,8 @@ import icing_funcs as icing
 
 DEBUG = True
 
+start_time = calendar.timegm(time.gmtime())
+
 ################################### User Config ###################################
 
 # MDV Grid
@@ -119,14 +121,6 @@ idcnt = 0
 #ijs = [ll.query(lat,lon)[0] for lat, lon in zip(df['lat'],df['lon'])]
 #print(ijs)
 #exit()
-
-# Write a helper function to format a string
-def format_time(t,fcst,mins,fmt):
-  dt = datetime.datetime.fromtimestamp(t)
-  if fmt=="fip":
-    return(dt.strftime('%Y%m%d')+"/g_"+dt.strftime('%H').zfill(2)+"0000/f_"+str(int(fcst)*3600).zfill(8)+".nc")
-  if fmt=="cip":
-    return(dt.strftime('%Y%m%d')+"/"+dt.strftime('%H').zfill(2)+dt.strftime('%M').zfill(2)+"00.nc")
 
 # Compute the date attributes of the PIREP time
 # Using list comprehension
@@ -245,38 +239,37 @@ df.loc[df.index,('UR_dist')] = [icing.ll_distance(hla,hlo,cla,clo,proj_params['e
 df.loc[df.index,('LR_dist')] = [icing.ll_distance(hla,hlo,cla,clo,proj_params['earth_radius']) for hla, hlo, cla, clo in zip(df['lat'],df['lon'],df['LR_la'],df['LR_lo'])]
 df.loc[df.index,('UL_dist')] = [icing.ll_distance(hla,hlo,cla,clo,proj_params['earth_radius']) for hla, hlo, cla, clo in zip(df['lat'],df['lon'],df['UL_la'],df['UL_lo'])]
 df.loc[df.index,('LL_dist')] = [icing.ll_distance(hla,hlo,cla,clo,proj_params['earth_radius']) for hla, hlo, cla, clo in zip(df['lat'],df['lon'],df['LL_la'],df['LL_lo'])]
-print(df)
 
 # Compute a minimum distance of X
-# If UR_dist < LR_dist & UL_dist & LL_dist then corner = "UR"
-# If LR_dist < UL_dist & LL_dist & UR_dist then corner = "LR"
-# If UL_dist < LL_dist & UR_dist & LR_dist then corner = "UL"
-# if LL_dist < UR_dist & LR_dist & UL_dist then corner = "LL"
-df.loc[df[(df['UR_dist']<df['LR_dist'])&(df['UR_dist']<df['UL_dist'])&(df['UR_dist']<df['LL_dist'])].index,('corner')] = "UR"
-df.loc[df[(df['LR_dist']<df['UL_dist'])&(df['LR_dist']<df['LL_dist'])&(df['LR_dist']<df['UR_dist'])].index,('corner')] = "LR"
-df.loc[df[(df['UL_dist']<df['LL_dist'])&(df['UL_dist']<df['UR_dist'])&(df['UL_dist']<df['LR_dist'])].index,('corner')] = "UL"
-df.loc[df[(df['LL_dist']<df['UR_dist'])&(df['LL_dist']<df['LR_dist'])&(df['LL_dist']<df['UL_dist'])].index,('corner')] = "LL"
+# If UR_dist < LR_dist & UL_dist & LL_dist then ENCAPS = "UR", corner = "LL"
+# If LR_dist < UL_dist & LL_dist & UR_dist then ENCAPS = "LR", corner = "UL"
+# If UL_dist < LL_dist & UR_dist & LR_dist then ENCAPS = "UL", corner = "LR"
+# if LL_dist < UR_dist & LR_dist & UL_dist then ENCAPS = "LL", corner = "UR"
+df.loc[df[(df['UR_dist']<df['LR_dist'])&(df['UR_dist']<df['UL_dist'])&(df['UR_dist']<df['LL_dist'])].index,('corner')] = "LL"
+df.loc[df[(df['LR_dist']<df['UL_dist'])&(df['LR_dist']<df['LL_dist'])&(df['LR_dist']<df['UR_dist'])].index,('corner')] = "UL"
+df.loc[df[(df['UL_dist']<df['LL_dist'])&(df['UL_dist']<df['UR_dist'])&(df['UL_dist']<df['LR_dist'])].index,('corner')] = "LR"
+df.loc[df[(df['LL_dist']<df['UR_dist'])&(df['LL_dist']<df['LR_dist'])&(df['LL_dist']<df['UL_dist'])].index,('corner')] = "UR"
 
 # Compute the minI, maxI, minJ, maxJ for the bounding box
-df.loc[df[df['corner']=="UL"].index,('minI')] = (df['home_i']-1)-offset # Left boundary
-df.loc[df[df['corner']=="UL"].index,('minJ')] = (df['home_j']-offset)   # Bottom boundary
-df.loc[df[df['corner']=="UL"].index,('maxI')] = (df['minI']+nside)-1    # Right boundary
-df.loc[df[df['corner']=="UL"].index,('maxJ')] = (df['minJ']+nside)-1    # Top boundary
+df.loc[df[df['corner']=="LR"].index,('minI')] = (df['home_i']-1)-offset # Left boundary
+df.loc[df[df['corner']=="LR"].index,('minJ')] = (df['home_j']-offset)   # Bottom boundary
+df.loc[df[df['corner']=="LR"].index,('maxI')] = (df['minI']+nside)-1    # Right boundary
+df.loc[df[df['corner']=="LR"].index,('maxJ')] = (df['minJ']+nside)-1    # Top boundary
 
-df.loc[df[df['corner']=="LL"].index,('minI')] = (df['home_i']-1)-offset # Left boundary
-df.loc[df[df['corner']=="LL"].index,('minJ')] = (df['home_j']-1)-offset # Bottom boundary
-df.loc[df[df['corner']=="LL"].index,('maxI')] = (df['minI']+nside)-1    # Right boundary
-df.loc[df[df['corner']=="LL"].index,('maxJ')] = (df['minJ']+nside)-1    # Top boundary
-
-df.loc[df[df['corner']=="UR"].index,('minI')] = (df['home_i']-offset)   # Left boundary
+df.loc[df[df['corner']=="UR"].index,('minI')] = (df['home_i']-1)-offset # Left boundary
 df.loc[df[df['corner']=="UR"].index,('minJ')] = (df['home_j']-1)-offset # Bottom boundary
 df.loc[df[df['corner']=="UR"].index,('maxI')] = (df['minI']+nside)-1    # Right boundary
 df.loc[df[df['corner']=="UR"].index,('maxJ')] = (df['minJ']+nside)-1    # Top boundary
 
-df.loc[df[df['corner']=="LR"].index,('minI')] = (df['home_i']-offset) # Left boundary
-df.loc[df[df['corner']=="LR"].index,('minJ')] = (df['home_j']-offset)   # Bottom boundary
-df.loc[df[df['corner']=="LR"].index,('maxI')] = (df['minI']+nside)-1    # Right boundary
-df.loc[df[df['corner']=="LR"].index,('maxJ')] = (df['minJ']+nside)-1    # Top boundary
+df.loc[df[df['corner']=="LL"].index,('minI')] = (df['home_i']-offset)   # Left boundary
+df.loc[df[df['corner']=="LL"].index,('minJ')] = (df['home_j']-1)-offset # Bottom boundary
+df.loc[df[df['corner']=="LL"].index,('maxI')] = (df['minI']+nside)-1    # Right boundary
+df.loc[df[df['corner']=="LL"].index,('maxJ')] = (df['minJ']+nside)-1    # Top boundary
+
+df.loc[df[df['corner']=="UL"].index,('minI')] = (df['home_i']-offset) # Left boundary
+df.loc[df[df['corner']=="UL"].index,('minJ')] = (df['home_j']-offset)   # Bottom boundary
+df.loc[df[df['corner']=="UL"].index,('maxI')] = (df['minI']+nside)-1    # Right boundary
+df.loc[df[df['corner']=="UL"].index,('maxJ')] = (df['minJ']+nside)-1    # Top boundary
 
 # Ensure everything is inside the grid
 df = df[(df['minI']>=0) & (df['minI']<=numX) & (df['minJ']>=0) & (df['minJ']<=numY)]
@@ -293,4 +286,6 @@ df['nsecfcst'] = nsecfcst
 # Columns we want are:
 # index,unix_time,lat,lon,flvl,temp,ibase1,itop1,iint1,ityp1,ibase2,itop2,iint2,ityp2,acft,rawObs,tmatch,nsecfcst,minI,maxI,minJ,maxJ,homeI,homeJ,corner,totPts,mfile_string,file_string
 df = df.reset_index(drop=True)
-df.to_csv("test.csv",header=False,columns=['unix_time','lat','lon','flvl','temp','ibase1','itop1','iint1','ityp1','ibase2','itop2','iint2','ityp2','actype','rawrep','tmatch','nsecfcst','minI','maxI','minJ','maxJ','home_i','home_j','corner','totPts','mfile_string','file_string'])
+df.to_csv(out,header=False,columns=['unix_time','lat','lon','flvl','temp','ibase1','itop1','iint1','ityp1','ibase2','itop2','iint2','ityp2','actype','rawrep','tmatch','nsecfcst','minI','maxI','minJ','maxJ','home_i','home_j','corner','totPts','mfile_string','file_string'])
+print("")
+print("PROCESSING TOOK: "+str(calendar.timegm(time.gmtime())-start_time)+" SECONDS.")

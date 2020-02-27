@@ -10,6 +10,9 @@
 ; Notes:
 ;___________________________________________________________________________
 
+; Timing
+wcStrt = systemfunc("date")
+
 ; Load NCL libraries
 load "/home/dadriaan/cvs/pat/dadriaan/scripts/ncl/load_ncl_libs.ncl"
 
@@ -423,3 +426,4 @@ do n=0,dimsizes(ut)-1,1
   idcnt = idcnt + 1
 
 end do
+wallClockElapseTime(wcStrt,"NCL PIREPS (500)",0)

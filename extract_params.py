@@ -44,7 +44,7 @@ m_id = "hrrr"
 #
 murl_pref = ""
 
-###### aurl_pref ######
+###### aurl_pref #######
 #
 # NAME: aurl_pref
 # OPTIONS:
@@ -54,6 +54,28 @@ murl_pref = ""
 # DESCRIPTION: Prefix for each of the URL's used for algorithm data input
 #
 aurl_pref = ""
+
+####### ourl_pref #######
+#
+# NAME: ourl_pref
+# OPTIONS:
+# TYPE: string
+# FORMAT:
+# DEFAULT:
+# DESCRIPTION: Prefix for each of the URL's used for observation data input
+#
+ourl_pref = ""
+
+####### chunk #######
+#
+# NAME: chunk
+# OPTIONS:
+# TYPE: bool
+# FORMAT:
+# DEFAULT: True
+# DESCRIPTION: Boolean, whether to chunk the data or not
+#
+chunk = True
 
 ####### ychunks #######
 #
@@ -103,6 +125,17 @@ avars = ['ICE_PROB','ICE_SEV','SLD','SEV_SCENARIO','POT_SCENARIO','SLD_SCENARIO'
 #              model output.
 #
 mvars = ['HGT','RH','SLW','TMP','VVEL','LIQ_COND','ICE_COND']
+
+####### ovars #######
+#
+# NAME: ovars
+# OPTIONS:
+# TYPE:
+# FORMAT:
+# DEFAULT:
+# DESCRIPTION: Provide a list of variables we want to read for the observation data
+#
+ovars = ['VISIBLE']
 
 ####### bubble #######
 #

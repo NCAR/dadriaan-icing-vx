@@ -172,7 +172,7 @@ def format_filename(t,fcst,prod,ff):
   
 # Function to convert a list of obs filenames/paths to unix times  
 def obs_file_list_to_unix(flist,url):
-  
+
   # Get a list of unix times for available files
   flTD = [str.split(f,(url+"/"))[-1] for f in flist]
 
@@ -186,54 +186,38 @@ def find_closest_obs_file(url,ff,obtime,window,dt):
   tlower = obtime-window
   tupper = obtime+window
 
-  # Create datestrings from tlower and tupper
-  tlds = datetime.datetime.fromtimestamp(tlower).strftime('%Y%m%d')
-  tuds = datetime.datetime.fromtimestamp(tupper).strftime('%Y%m%d')
-  
-  # Create an initial file list
-  if os.path.exists('%s/%s' % (url,tlds)):
-    flist = glob.glob('%s/%s/*.%s' % (url,tlds,ff))
-    flist.sort()
-  else:
-    print("")
-    print("WARNING! PATH DOES NOT EXIST IN find_closest_obs_file.")
-    print("")
-    exit()
+  # Create some filestrings for globbing
+  tlowFloor = datetime.datetime.timestamp(datetime.datetime.strptime(datetime.datetime.fromtimestamp(tlower).strftime('%Y%m%d %H'),'%Y%m%d %H'))
+  tupCeil = datetime.datetime.timestamp(datetime.datetime.strptime(datetime.datetime.fromtimestamp(tupper).strftime('%Y%m%d %H:59:59'),'%Y%m%d %H:%M:%S'))
 
-  # Find differences
-  diffL = [abs(f-obtime) for f in obs_file_list_to_unix(flist,url)]
-
-  # If the tlds!=tuds, then repeat the above but for tuds
-  if tlds!=tuds:
-    if os.path.exists('%s/%s' % (url,tuds)):
-      flist2 = glob.glob('%s/%s/*.%s' % (url,tuds,ff))
-      flist2.sort()
+  # Loop from tlowFloor to tupCeil and collect relevant files
+  flist = []
+  while tlowFloor <= tupCeil:
+    if os.path.exists('%s/%s' % (url,datetime.datetime.fromtimestamp(tlowFloor).strftime('%Y%m%d'))):
+      sstr = datetime.datetime.fromtimestamp(tlowFloor).strftime('%Y%m%d/%H')
+      if flist==[]:
+        flist = glob.glob('%s/%s*.%s' % (url,sstr,ff))
+      else:
+        [flist.append(f) for f in glob.glob('%s/%s*.%s' % (url,sstr,ff))]
     else:
       print("")
       print("WARNING! PATH DOES NOT EXIST IN find_closest_obs_file.")
       print("")
       exit()
+ 
+    # Increment the tlowFloor by 1 hour 
+    tlowFloor = tlowFloor + 3600
 
-    # Find differences
-    diffU = [abs(f-obtime) for f in obs_file_list_to_unix(flist2,url)]
+  # If we didn't find any files that meet the criteria, return missing
+  if flist==[]:
+    return(-9999.0)
 
-    # Return the unix time of the file matching the obtime
-    if min(diffU)<min(diffL):
-      #return(flist2[diffU.index(min(diffU))])
-      if min(diffU)>dt:
-        return(-9999.0)
-      else:
-        return(obs_file_list_to_unix(flist2,url)[diffU.index(min(diffU))])
-    else:
-      #return(flist[diffL.index(min(diffL))])
-      if min(diffL)>dt:
-        return(-9999.0)
-      else:
-        return(obs_file_list_to_unix(flist,url)[diffL.index(min(diffL))])
+  # Find differences
+  diffs = [abs(f-obtime) for f in obs_file_list_to_unix(flist,url)]
+  
+  # Return the unix time of the file matching the obtime
+  if min(diffs)>dt:
+    return(-9999.0)
   else:
-    #return(flist[diffL.index(min(diffL))])
-    if min(diffL)>dt:
-      return(-9999.0)
-    else:
-      return(obs_file_list_to_unix(flist,url)[diffL.index(min(diffL))])
-
+    #return(obs_file_list_to_unix(flist,url)[diffs.index(min(diffs))])
+    return(obs_file_list_to_unix([flist[diffs.index(min(diffs))]],url)[0])

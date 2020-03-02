@@ -71,6 +71,9 @@ matchwindow = p.opt['match_window_method']
 # For FIP, set to 0. For CIP, use minutes after the hour that CIP was run
 matchmins = p.opt['match_time_minutes']
 
+# Name of model
+model_name = p.opt['model_name']
+
 #######################################################################################
 
 print("")
@@ -92,7 +95,17 @@ gds = grid.to_xarray()
 del(grid)
 
 # Return the projection information from the icing functions
-proj_params = icing.load_hrrr_proj(gds)
+if model_name=='rap':
+  proj_params = icing.load_rap_proj(gds)
+elif model_name=='hrrr':  
+  proj_params = icing.load_hrrr_proj(gds)
+elif model_name=='goes16':
+  proj_params = icing.load_goes16_proj(gds)
+else:
+  print("")
+  print("MODEL NOT SUPPORTED")
+  print("")
+  exit()
 
 # Assign the coordinate reference system using MetPy
 gds = gds.metpy.assign_crs(cf_attributes=proj_params)
@@ -109,18 +122,16 @@ ll = icing.Kdtree_fast(gds['longitude'].values,gds['latitude'].values)
 numX = gds.dims['x']
 numY = gds.dims['y']
 
-# Counter for the number of obs
-ocnt = 1
-
-# Counter for processed obs
-idcnt = 0
-
 # Find the ij's of all the PIREPs
 # This will return a list of values like [(i1,j1),(i2,j2)]
 # Using list comprehension
 #ijs = [ll.query(lat,lon)[0] for lat, lon in zip(df['lat'],df['lon'])]
 #print(ijs)
 #exit()
+
+# Create a timestamp from the user supplied max_obs_time and filter the obs based on that
+obs_time_max = datetime.datetime.timestamp(datetime.datetime.strptime(p.opt['max_obs_time'],"%Y-%m-%d %H:%M:%S"))
+obs_time_min = datetime.datetime.timestamp(datetime.datetime.strptime(p.opt['min_obs_time'],"%Y-%m-%d %H:%M:%S"))
 
 # Compute the date attributes of the PIREP time
 # Using list comprehension
@@ -197,16 +208,34 @@ if DEBUG:
   print(df[['unix_time','tlower','tupper','timedelta_low','timedelta_upp','tmatch']])
   print(len(df))
 
+# Filter the PIREPs based on the tmatch time. This is so we don't get/use model/obs data outside the time window
+df = df.loc[df[df['tmatch']>=obs_time_min].index]
+df = df.loc[df[df['tmatch']<=obs_time_max].index]
+
 # Set the filename stuff
-df.loc[df.index,('mfile_string')] = [icing.format_filename((t-nsecfcst),nsecfcst/3600,matchmins,'fip','nc') for t in df['tmatch']]
-df.loc[df.index,('file_string')] = [icing.format_filename(t,nsecfcst/3600,matchmins,'cip','nc') for t in df['tmatch']]
+df.loc[df.index,('mfile_string')] = [icing.format_filename((t-nsecfcst),nsecfcst/3600,'fip','nc') for t in df['tmatch']]
+df.loc[df.index,('file_string')] = [icing.format_filename(t,nsecfcst/3600,'cip','nc') for t in df['tmatch']]
+
+# Set the obsfiletime
+if model_name in ['goes16']:
+  df.loc[df.index,('obsfiletime')] = [icing.find_closest_obs_file(p.opt['data_url'],'mdv',t,1800,900) for t in df['unix_time']]
+  # Filter out any PIREPs that weren't matched to an obs file (obs dataset file doesn't exist)
+  df = df.loc[df[df['obsfiletime']>0].index]
+else:
+  df.loc[df.index,('obsfiletime')] = 0.0
+#df.loc[df.index,('obsfiletime')] = 0.0
 
 # Use list comprehension and add columns for i,j of PIREP
 ijs = [ll.query(lat,lon) for lat, lon in zip(df['lat'],df['lon'])]
 df.loc[df.index,('home_i')] = list(zip(*ijs))[1]
 df.loc[df.index,('home_j')] = list(zip(*ijs))[0]
+# Make sure i,j are integers
+df = df.astype({'home_i':'int32','home_j':'int32'})
 df.loc[df.index,('home_la')] = [grid_lat[j][i] for j, i in zip(df['home_j'],df['home_i'])]
 df.loc[df.index,('home_lo')] = [grid_lon[j][i] for j, i in zip(df['home_j'],df['home_i'])]
+
+if DEBUG:
+  print(df[['home_la','home_lo']])
 
 # Add eight new columns, for UR, LR, UL, LL i,j respectively
 df.loc[df.index,('UR_i')] = df['home_i']+1
@@ -219,10 +248,10 @@ df.loc[df.index,('LL_i')] = df['home_i']-1
 df.loc[df.index,('LL_j')] = df['home_j']-1
 
 # Filter out the dataframe again, by whether any of the corners moved off the grid
-df = df[(df['UR_i']>=0) & (df['UR_i']<=numX) & (df['UR_j']>=0) & (df['UR_j']<=numY)]
-df = df[(df['LR_i']>=0) & (df['LR_i']<=numX) & (df['LR_j']>=0) & (df['LR_j']<=numY)]
-df = df[(df['UL_i']>=0) & (df['UL_i']<=numX) & (df['UL_j']>=0) & (df['UL_j']<=numY)]
-df = df[(df['LL_i']>=0) & (df['LL_i']<=numX) & (df['LL_j']>=0) & (df['LL_j']<=numY)]
+df = df[(df['UR_i']>=0) & (df['UR_i']<numX) & (df['UR_j']>=0) & (df['UR_j']<numY)]
+df = df[(df['LR_i']>=0) & (df['LR_i']<numX) & (df['LR_j']>=0) & (df['LR_j']<numY)]
+df = df[(df['UL_i']>=0) & (df['UL_i']<numX) & (df['UL_j']>=0) & (df['UL_j']<numY)]
+df = df[(df['LL_i']>=0) & (df['LL_i']<numX) & (df['LL_j']>=0) & (df['LL_j']<numY)]
 
 # Add the latitude/longitude of the corner points
 df.loc[df.index,('UR_la')] = [grid_lat[j][i] for j, i in zip(df['UR_j'],df['UR_i'])]
@@ -271,9 +300,12 @@ df.loc[df[df['corner']=="UL"].index,('minJ')] = (df['home_j']-offset)   # Bottom
 df.loc[df[df['corner']=="UL"].index,('maxI')] = (df['minI']+nside)-1    # Right boundary
 df.loc[df[df['corner']=="UL"].index,('maxJ')] = (df['minJ']+nside)-1    # Top boundary
 
+# Convert i,j to integer
+df = df.astype({'minI':'int32','maxI':'int32','minJ':'int32','maxJ':'int32'})
+
 # Ensure everything is inside the grid
-df = df[(df['minI']>=0) & (df['minI']<=numX) & (df['minJ']>=0) & (df['minJ']<=numY)]
-df = df[(df['maxI']>=0) & (df['maxI']<=numX) & (df['maxJ']>=0) & (df['maxJ']<=numY)]
+df = df[(df['minI']>=0) & (df['minI']<numX) & (df['minJ']>=0) & (df['minJ']<numY)]
+df = df[(df['maxI']>=0) & (df['maxI']<numX) & (df['maxJ']>=0) & (df['maxJ']<numY)]
 
 # Compute some statistics about the neighborhood
 df.loc[df.index,('totPts')] = ((df['maxI']-df['minI'])+1)*((df['maxJ']-df['minJ'])+1)
@@ -286,6 +318,6 @@ df['nsecfcst'] = nsecfcst
 # Columns we want are:
 # index,unix_time,lat,lon,flvl,temp,ibase1,itop1,iint1,ityp1,ibase2,itop2,iint2,ityp2,acft,rawObs,tmatch,nsecfcst,minI,maxI,minJ,maxJ,homeI,homeJ,corner,totPts,mfile_string,file_string
 df = df.reset_index(drop=True)
-df.to_csv(out,header=False,columns=['unix_time','lat','lon','flvl','temp','ibase1','itop1','iint1','ityp1','ibase2','itop2','iint2','ityp2','actype','rawrep','tmatch','nsecfcst','minI','maxI','minJ','maxJ','home_i','home_j','corner','totPts','mfile_string','file_string'])
+df.to_csv(out,header=False,columns=['unix_time','lat','lon','flvl','temp','ibase1','itop1','iint1','ityp1','ibase2','itop2','iint2','ityp2','actype','rawrep','tmatch','nsecfcst','minI','maxI','minJ','maxJ','home_i','home_j','corner','totPts','mfile_string','file_string','obsfiletime'])
 print("")
 print("PROCESSING TOOK: "+str(calendar.timegm(time.gmtime())-start_time)+" SECONDS.")

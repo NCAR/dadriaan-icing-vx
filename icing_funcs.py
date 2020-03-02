@@ -8,6 +8,8 @@ import time
 import pyart
 import math
 import datetime
+import glob
+import itertools
 
 from math import pi
 from numpy import cos, sin
@@ -59,6 +61,7 @@ def load_mdv_dataset(mdvFiles,DEBUG):
   # Return the MDV dataset object
   if DEBUG:
     print(time.time()-st)
+  allData = allData.rename({'x':'x0','y':'y0','z':'z0'})
   return(allData)
 
 # Load HRRR projection params into a CF-compliant dictionary
@@ -69,14 +72,50 @@ def load_hrrr_proj(data):
   cfparams['standard_parallel'] = 38.5
   cfparams['longitude_of_projection_origin'] = -97.5
   cfparams['latitude_of_projection_origin'] = 38.5
-  #cfparams['ellps'] = 'sphere'
-  #cfparams['earth_radius'] = 6378137.0 # EQUATORIAL, OLD MDV
   cfparams['earth_radius'] = 6371229.0 # HRRR SPHERE
-  #cfparams['earth_radius'] = 6370997.0 # PROJ SPHERE
-  #cfparams['earth_radius'] = 6371000.0 # MDV SPHERE
   cfparams['projection_x_coordinate'] = data.x.values
   cfparams['projection_y_coordinate'] = data.y.values
+  #cfparams['ellps'] = 'sphere'
+  #cfparams['earth_radius'] = 6378137.0 # EQUATORIAL, OLD MDV
+  #cfparams['earth_radius'] = 6370997.0 # PROJ SPHERE
+  #cfparams['earth_radius'] = 6371000.0 # MDV SPHERE
   
+  return(cfparams)
+
+# Load RAP projection params into a CF-compliant dictionary
+def load_rap_proj(data):
+  
+  cfparams = {}
+  cfparams['grid_mapping_name'] = "lambert_conformal_conic"
+  cfparams['standard_parallel'] = 25.0
+  cfparams['longitude_of_projection_origin'] = -95.0
+  cfparams['latitude_of_projection_origin'] = 25.0
+  cfparams['earth_radius'] = 6371229.0 # RAP SPHERE
+  cfparams['projection_x_coordinate'] = data.x.values
+  cfparams['projection_y_coordinate'] = data.y.values
+  #cfparams['ellps'] = 'sphere'
+  #cfparams['earth_radius'] = 6378137.0 # EQUATORIAL, OLD MDV
+  #cfparams['earth_radius'] = 6370997.0 # PROJ SPHERE
+  #cfparams['earth_radius'] = 6371000.0 # MDV SPHERE
+
+  return(cfparams)
+
+# Load GOES-16 projection params into a CF_compliant dictionary
+def load_goes16_proj(data):
+
+  cfparams = {}
+  cfparams['grid_mapping_name'] = "lambert_conformal_conic"
+  cfparams['standard_parallel'] = 25.0
+  cfparams['longitude_of_projection_origin'] = -95.0
+  cfparams['latitude_of_projection_origin'] = 25.0
+  cfparams['earth_radius'] = 6371000.0 # MDV SPHERE
+  cfparams['projection_x_coordinate'] = data.x.values
+  cfparams['projection_y_coordinate'] = data.y.values
+  #cfparams['ellps'] = 'sphere'
+  #cfparams['earth_radius'] = 6378137.0 # EQUATORIAL, OLD MDV
+  #cfparams['earth_radius'] = 6370997.0 # PROJ SPHERE
+  #cfparams['earth_radius'] = 6371000.0 # MDV SPHERE
+
   return(cfparams)
 
 # KDTree for lat/lon searching
@@ -118,7 +157,7 @@ def ll_distance(lat1,lon1,lat2,lon2,erad):
   return(math.sqrt((math.pow(dX,2))+(math.pow(dY,2))+(math.pow(dZ,2)))*erad)
 
 # Return time/date file formats based on a UNIX timestamp
-def format_filename(t,fcst,mins,prod,ff):
+def format_filename(t,fcst,prod,ff):
   dt = datetime.datetime.fromtimestamp(t)
   # Format = YYYYMMDD/g_HHHHHH/f_SSSSSSSS.FF
   if prod=='fip':
@@ -126,7 +165,75 @@ def format_filename(t,fcst,mins,prod,ff):
   if prod=='cip':
     # Format = YYYYMMDD/YYYYMMDD_HHMMSS.FF
     if ff=='nc':
-      return(dt.strftime('%Y%m%d')+"/"+dt.strftime('%Y%m%d')+"_"+dt.strftime('%H').zfill(2)+dt.strftime('%M').zfill(2)+"00.nc")
+      return(dt.strftime('%Y%m%d')+"/"+dt.strftime('%Y%m%d')+"_"+dt.strftime('%H').zfill(2)+dt.strftime('%M').zfill(2)+dt.strftime('%S').zfill(2)+".nc")
     # Format = YYYYMMDD/HHMMSS.FF
     if ff=='mdv':
-      return(dt.strftime('%Y%m%d')+"/"+dt.strftime('%H').zfill(2)+dt.strftime('%M').zfill(2)+"00.mdv")
+      return(dt.strftime('%Y%m%d')+"/"+dt.strftime('%H').zfill(2)+dt.strftime('%M').zfill(2)+dt.strftime('%S').zfill(2)+".mdv")
+  
+# Function to convert a list of obs filenames/paths to unix times  
+def obs_file_list_to_unix(flist,url):
+  
+  # Get a list of unix times for available files
+  flTD = [str.split(f,(url+"/"))[-1] for f in flist]
+
+  # Convert to unix time
+  return([datetime.datetime.timestamp(datetime.datetime.strptime(f,'%Y%m%d/%H%M%S.mdv')) for f in flTD])
+
+# Function to locate the closest obs file to a time
+def find_closest_obs_file(url,ff,obtime,window,dt):
+
+  # Create a window for searching
+  tlower = obtime-window
+  tupper = obtime+window
+
+  # Create datestrings from tlower and tupper
+  tlds = datetime.datetime.fromtimestamp(tlower).strftime('%Y%m%d')
+  tuds = datetime.datetime.fromtimestamp(tupper).strftime('%Y%m%d')
+  
+  # Create an initial file list
+  if os.path.exists('%s/%s' % (url,tlds)):
+    flist = glob.glob('%s/%s/*.%s' % (url,tlds,ff))
+    flist.sort()
+  else:
+    print("")
+    print("WARNING! PATH DOES NOT EXIST IN find_closest_obs_file.")
+    print("")
+    exit()
+
+  # Find differences
+  diffL = [abs(f-obtime) for f in obs_file_list_to_unix(flist,url)]
+
+  # If the tlds!=tuds, then repeat the above but for tuds
+  if tlds!=tuds:
+    if os.path.exists('%s/%s' % (url,tuds)):
+      flist2 = glob.glob('%s/%s/*.%s' % (url,tuds,ff))
+      flist2.sort()
+    else:
+      print("")
+      print("WARNING! PATH DOES NOT EXIST IN find_closest_obs_file.")
+      print("")
+      exit()
+
+    # Find differences
+    diffU = [abs(f-obtime) for f in obs_file_list_to_unix(flist2,url)]
+
+    # Return the unix time of the file matching the obtime
+    if min(diffU)<min(diffL):
+      #return(flist2[diffU.index(min(diffU))])
+      if min(diffU)>dt:
+        return(-9999.0)
+      else:
+        return(obs_file_list_to_unix(flist2,url)[diffU.index(min(diffU))])
+    else:
+      #return(flist[diffL.index(min(diffL))])
+      if min(diffL)>dt:
+        return(-9999.0)
+      else:
+        return(obs_file_list_to_unix(flist,url)[diffL.index(min(diffL))])
+  else:
+    #return(flist[diffL.index(min(diffL))])
+    if min(diffL)>dt:
+      return(-9999.0)
+    else:
+      return(obs_file_list_to_unix(flist,url)[diffL.index(min(diffL))])
+

@@ -118,7 +118,50 @@ match_time_minutes = 0
 # DEFAULT: []
 # DESCRIPTION: Provide a list of column names for the input CSV file.
 #              
-#
 input_csv_columns = ['unix_time','lat','lon','flvl','cbase1','cvg1','ctop1','cbase2','cvg2','ctop2','vis','obx','temp','wdir','wspd','ibase1','itop1','iint1','ityp1','ibase2','itop2','iint2','ityp2','tbase1','ttop1','tint1','ttyp1','tfreq1','tbase2','ttop2','tint2','ttyp2','tfreq2','actype','rawrep']
+
+####### model_name #######
+#
+# NAME: model_name
+# OPTIONS: "rap" or "hrrr"
+# TYPE: string
+# FORMAT:
+# DEFAULT: "hrrr"
+# DESCRIPTION: Provide the model name as a string 
+#
+model_name = "hrrr"
+
+####### max_obs_time #######
+#
+# NAME: max_obs_time
+# OPTIONS:
+# TYPE: string
+# FORMAT: YYYY-MM-DD HH:MM:SS
+# DEFAULT:
+# DESCRIPTION: Provide a maximum obs time that shouldn't be exceeded
+#
+max_obs_time = ""
+
+####### min_obs_time #######
+#
+# NAME: max_obs_time
+# OPTIONS:
+# TYPE: string
+# FORMAT: YYYY-MM-DD HH:MM:SS
+# DEFAULT:
+# DESCRIPTION: Provide a minimum obs time that shouldn't be exceeded
+#
+min_obs_time = ""
+
+####### data_url #######
+#
+# NAME: data URL
+# OPTIONS:
+# TYPE: string
+# FORMAT: "/path/to/data"
+# DEFAULT:
+# DESCRIPTION: Provide a URL to a dataset you want to match times to
+#
+data_url = ""
 
 """

@@ -13,12 +13,16 @@ import statistics as stat
 import numpy as np
 from scipy import stats
 import subprocess, os, time
+import time, calendar
 
 # Add current path
 sys.path.append('.')
 
 # Import icing funcs
 import icing_funcs as icing
+
+# Time for beginning of script
+totBeg = time.gmtime()
 
 ############################# User Config #################################
 
@@ -47,7 +51,7 @@ mid = p.opt['m_id']
 # HRRR_prs (40x1059x1799), chunk = 40x158x158
 # RAP_prs (39x337x451), chunk = 39x160x160
 if ff=="mdv":
-  chunks = {'y':p.opt['ychunks'],'x':p.opt['xchunks']}
+  chunks = {'y0':p.opt['ychunks'],'x0':p.opt['xchunks']}
 elif ff=="netcdf":
   chunks = {'y0':p.opt['ychunks'],'x0':p.opt['xchunks']}
 else:
@@ -74,12 +78,9 @@ if vAlgo:
 if vNWP:
   for v in p.opt['mvars']:
     if v not in ['HGT']:
-      murls.append(os.path.join(p.opt['murl_pref'],mstring,'data/%s/model',mid,'pressure_derived/conus_%s' % (ff,v)))
+      murls.append(os.path.join(p.opt['murl_pref'],mstring,'data/%s/model' % (ff),mid,'pressure_derived/conus_%s' % (v)))
 # Always load HGT      
 murls.append(os.path.join(p.opt['murl_pref'],mstring,'data/%s/model' % (ff),mid,'pressure_derived/conus_HGT'))
-
-# List of netCDF files to open
-ncFiles = []
 
 # If zOff = 0, use this bubble to search for points around the PIREP within 1000 ft
 bubble = p.opt['bubble']
@@ -88,7 +89,7 @@ bubble = p.opt['bubble']
 dz = p.opt['dz']
 
 # Column names in CSV file
-colNames = ['id','unixObs','lat','lon','flvl','temp','ibase1','itop1','iint1','ityp1','ibase2','itop2','iint2','ityp2','acft','rawOb','unixFcst','forecast','minI','maxI','minJ','maxJ','homeI','homeJ','corner','npts','mfile_string','file_string']
+colNames = ['id','unixObs','lat','lon','flvl','temp','ibase1','itop1','iint1','ityp1','ibase2','itop2','iint2','ityp2','acft','rawOb','unixFcst','forecast','minI','maxI','minJ','maxJ','homeI','homeJ','corner','npts','mfile_string','file_string','obsfiletime']
 
 # Column names for dataframe of results that will be appended to the dataframe of the input data
 vxCols = ['id','file_string','probFYOY','probFNON','probFNOY','probFYON','sevFYOY','sevFNON','sevFNOY','sevFYON','VVELnear','VVELmean','VVELmed','VVELstdev','RHnear','RHmean','RHmed','RHstdev','SLWnear','SLWmean','SLWmed','SLWstdev','TMPnear','TMPmean','TMPmed','TMPstdev','PCPnear','PCPmode','PCPuni','PCPs','SCENnear','SCENmode','SCENuni','SCENs','nPtsHood','nLevHood','nPtsStats','isMulti','levNear','zNear','badPirep','slwFYOY','slwFYON','slwFNOY','slwFNON','probMIN','probMAX','sevMIN','sevMAX','VVELmin','VVELmax','RHmin','RHmax','TMPmin','TMPmax','SLWmin','SLWmax','ICECmin','ICECmax','LIQCmin','LIQCmax','TOTCmin','TOTCmax','potMIN','potMAX','sldMIN','sldMAX','PSCENnear','PSCENmode','PSCENuni','PSCENs','LSCENnear','LSCENmode','LSCENuni','LSCENs','zBot','zTop']
@@ -159,6 +160,8 @@ for name, group in groups:
     print((group.file_string.iloc[0]))
 
   # Open multiple files so we have height info
+  # List of netCDF files to open
+  ncFiles = []
   print("")
   print("LOADING DATA")
   if ff=="mdv":
@@ -170,6 +173,13 @@ for name, group in groups:
       ncFiles.append('%s/%s' % (u,mdv_file_string.replace(".nc",".mdv")))
     for u in murls:
       ncFiles.append('%s/%s' % (u,group.mfile_string.iloc[0].replace(".nc",".mdv")))
+    # Double check files exist
+    for f in ncFiles:
+      if not os.path.exists('%s' % (f)):
+        print("")
+        print("WARNING! FILE %s DOES NOT EXIST." % (f))
+        print(group.file_string.iloc[0])
+        print("")
     ncData = icing.load_mdv_dataset(ncFiles,True)
     ncData.chunk(chunks=chunks)
   elif ff=="netcdf":
@@ -177,6 +187,13 @@ for name, group in groups:
       ncFiles.append('%s/%s' % (u,group.file_string.iloc[0]))
     for u in murls:
       ncFiles.append('%s/%s' % (u,group.mfile_string.iloc[0]))
+    # Double check files exist
+    for f in ncFiles:
+      if not os.path.exists('%s' % (f)):
+        print("")
+        print("WARNING! FILE %s DOES NOT EXIST." % (f))
+        print(group.file_string.iloc[0])
+        print("")
     #ncData = xr.open_mfdataset(ncFiles,chunks=chunks,combine='by_coords',compat='override')
     ncData = xr.open_mfdataset(ncFiles,chunks=chunks,combine='by_coords')
   else:
@@ -514,3 +531,7 @@ for name, group in groups:
   # Exit after one model file
   #sys.exit(0)
 
+# Time for end of script
+totEnd = (calendar.timegm(time.gmtime())-calendar.timegm(totBeg))
+print("PROCESSING TOOK: "+str(totEnd/60.0)+" MINUTES.")
+print("")

@@ -292,4 +292,15 @@ infile = "tmp.in"
 #
 file_format = "mdv"
 
+####### topo_file #######
+#
+# NAME: topo_file
+# OPTIONS:
+# TYPE: string
+# FORMAT:
+# DEFAULT:
+# DESCRIPTION: Specify the full path to a full grid topo file in the correct file_format
+#
+topo_file = "/home/dadriaan/cvs/data/projects/icing/fipv2/algo/topo_CONUS_HRRR/topo.mdv"
+
 """

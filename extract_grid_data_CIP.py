@@ -320,6 +320,7 @@ for name, group in groups:
       # If no top was found but a base was found, use the maxZ as the top
       elif donutTop.z0.values.size==0 and donutBot.z0.values.size>0:   
         # Construct the vertical neighborhood using the pressure levels and dz
+        # This neighborhood goes from the bottom of the donutBot to the top of the grid
         finalHood = regionDS.sel(z0=list(range(int(max(donutBot.z0.values)),int(min(ncData.z0.values)-dz),-dz)))
       # Found a top but no bottom- just skip this unclear why it happens. I think it is if the PIREP base is really
       # high but no model levels are within 1000ft of it, but there are some model levels within 1000ft of the PIREP
@@ -333,6 +334,7 @@ for name, group in groups:
       # Both a top and a base were found
       else:
         # Construct the vertical neighborhood using the pressure levels and dz
+        # This neighborhood goes from the bottom of donutBot to the top of donutTop
         finalHood = regionDS.sel(z0=list(range(int(max(donutBot.z0.values)),int(min(donutTop.z0.values)-dz),-dz)))
 
       # Compute a representative height near the middle of the range between pBot and pTop

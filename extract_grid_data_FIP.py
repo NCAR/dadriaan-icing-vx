@@ -78,6 +78,8 @@ if vNWP:
       urls.append(os.path.join(p.opt['murl_pref'],mstring,'data/%s/model' % (ff),mid,'pressure_derived/conus_%s' % (v)))
 # Always load HGT
 urls.append(os.path.join(p.opt['murl_pref'],mstring,'data/%s/model' % (ff),mid,'pressure_derived/conus_HGT'))
+# Always load TOPO
+urls.append(p.opt['topo_file'])
 
 # If zOff = 0, use this bubble to search for points around the PIREP within 1000 ft
 bubble = p.opt['bubble']
@@ -89,7 +91,7 @@ dz = p.opt['dz']
 colNames = ['id','unixObs','lat','lon','flvl','temp','ibase1','itop1','iint1','ityp1','ibase2','itop2','iint2','ityp2','acft','rawOb','unixFcst','forecast','minI','maxI','minJ','maxJ','homeI','homeJ','corner','npts','mfile_string','file_string','obsfiletime']
 
 # Column names for dataframe of results that will be appended to the dataframe of the input data
-vxCols = ['id','file_string','probFYOY','probFNON','probFNOY','probFYON','sevFYOY','sevFNON','sevFNOY','sevFYON','VVELnear','VVELmean','VVELmed','VVELstdev','RHnear','RHmean','RHmed','RHstdev','SLWnear','SLWmean','SLWmed','SLWstdev','TMPnear','TMPmean','TMPmed','TMPstdev','PCPnear','PCPmode','PCPuni','PCPs','SCENnear','SCENmode','SCENuni','SCENs','nPtsHood','nLevHood','nPtsStats','isMulti','levNear','zNear','badPirep','slwFYOY','slwFYON','slwFNOY','slwFNON','probMIN','probMAX','sevMIN','sevMAX','VVELmin','VVELmax','RHmin','RHmax','TMPmin','TMPmax','SLWmin','SLWmax','ICECmin','ICECmax','LIQCmin','LIQCmax','TOTCmin','TOTCmax','potMIN','potMAX','sldMIN','sldMAX','zBot','zTop']
+vxCols = ['id','file_string','probFYOY','probFNON','probFNOY','probFYON','sevFYOY','sevFNON','sevFNOY','sevFYON','VVELnear','VVELmean','VVELmed','VVELstdev','RHnear','RHmean','RHmed','RHstdev','SLWnear','SLWmean','SLWmed','SLWstdev','TMPnear','TMPmean','TMPmed','TMPstdev','PCPnear','PCPmode','PCPuni','PCPs','SCENnear','SCENmode','SCENuni','SCENs','nPtsHood','nLevHood','nPtsStats','isMulti','levNear','zNear','badPirep','slwFYOY','slwFYON','slwFNOY','slwFNON','probMIN','probMAX','sevMIN','sevMAX','VVELmin','VVELmax','RHmin','RHmax','TMPmin','TMPmax','SLWmin','SLWmax','ICECmin','ICECmax','LIQCmin','LIQCmax','TOTCmin','TOTCmax','potMIN','potMAX','sldMIN','sldMAX','kBot','kTop']
 
 # Number of seconds in forecast lead
 nsecfcst = 10800
@@ -166,7 +168,10 @@ for name, group in groups:
   print("LOADING DATA")
   if ff=="mdv":
     for u in urls:
-      ncFiles.append('%s/%s' % (u,group.mfile_string.iloc[0].replace(".nc",".mdv")))
+      if 'topo' not in u:
+        ncFiles.append('%s/%s' % (u,group.mfile_string.iloc[0].replace(".nc",".mdv")))
+      else:
+        ncFiles.append(u)
     # Double check files exist
     for f in ncFiles:
       if not os.path.exists('%s' % (f)):
@@ -174,7 +179,7 @@ for name, group in groups:
         print("WARNING! FILE %s DOES NOT EXIST." % (f))
         print(group.mfile_string.iloc[0])
         print("")
-    ncData = icing.load_mdv_dataset(ncFiles,True)
+    ncData = icing.load_mdv_dataset(ncFiles,True,True)
     ncData.chunk(chunks=chunks)
   elif ff=="netcdf":
     for u in urls:
@@ -193,8 +198,6 @@ for name, group in groups:
     print("UNKNOWN FILE FORMAT.")
     sys.exit(1)
 
-  print(ncData)
-  
   # Correct NA values in certain variables (do this before correcting to zero)
   if vNWP:
     ncData['SLW'] = ncData.SLW.fillna(0.0)
@@ -224,6 +227,9 @@ for name, group in groups:
   # Add a total condensate variable
   if vNWP:
     ncData['TOT_COND'] = ncData['ICE_COND']+ncData['LIQ_COND']
+
+  # Mask with TOPO
+  ncData = ncData.where(ncData.HGT>=ncData.TOPO.isel(z0=ncData.dims['z0']-1))
 
   # Loop over each item in the series
   icnt = 0
@@ -267,7 +273,7 @@ for name, group in groups:
       continue 
 
     # Subset the dataset at the specific indexes. Returns Dataset object.
-    regionDS = ncData.isel(time=[0],y0=slice(group.minJ.iloc[icnt],group.maxJ.iloc[icnt]+1),x0=slice(group.minI.iloc[icnt],group.maxI.iloc[icnt]+1))
+    regionDS = ncData.isel(y0=slice(group.minJ.iloc[icnt],group.maxJ.iloc[icnt]+1),x0=slice(group.minI.iloc[icnt],group.maxI.iloc[icnt]+1))
    
     # Convert height to feet inside the dataset (modify in place)
     regionDS['HGT'] = regionDS.HGT*3.281 # Convert gpm to feet to match with PIREP
@@ -325,8 +331,8 @@ for name, group in groups:
     # Find the closest z-level to the PIREP
     # Requires 2 steps: first, use sel to use the actual height values (coordinate indexing) then use isel to
     # get the correct i,j (positional indexing)
-    nearSub = ncData.sel(z0=list(range(int(finalHood.z0.values[0]),int(finalHood.z0.values[-1])-dz,-dz)))
-    nearestHood = nearSub.isel(time=[0],y0=group.homeJ.iloc[icnt],x0=group.homeI.iloc[icnt])
+    nearSub = ncData.sel(z0=list(range(int(max(finalHood.z0.values)),int(min(finalHood.z0.values))-dz,-dz)))
+    nearestHood = nearSub.isel(y0=group.homeJ.iloc[icnt],x0=group.homeI.iloc[icnt])
    
     # Just find the nearest K-level now to the height closest to the pNear value (meanZPirep)
     nearestFinal = nearestHood.isel(z0=[np.argmin(abs((nearestHood.HGT.values*3.281)-pNear))])
@@ -341,40 +347,41 @@ for name, group in groups:
     # Set some output data
     vxData['isMulti'][vxcnt] = isMulti
     vxData['levNear'][vxcnt] = nearestFinal.z0.values[0]
-    vxData['zNear'][vxcnt] = nearestFinal.HGT.values[0][0]*3.281
+    vxData['zNear'][vxcnt] = nearestFinal.HGT.values[0]*3.281
 
     # VARnear: val
-    if vNear:
-      print("NEAR")
-      vxData['VVELnear'][vxcnt] = nearestFinal.VVEL.values.flatten()[0]
-      vxData['RHnear'][vxcnt] = nearestFinal.RH.values.flatten()[0]
-      vxData['SLWnear'][vxcnt] = nearestFinal.SLW.values.flatten()[0]
-      vxData['TMPnear'][vxcnt] = nearestFinal.TMP.values.flatten()[0]
+    if vNWP:
+      if vNear:
+        print("NEAR")
+        vxData['VVELnear'][vxcnt] = nearestFinal.VVEL.values.flatten()[0]
+        vxData['RHnear'][vxcnt] = nearestFinal.RH.values.flatten()[0]
+        vxData['SLWnear'][vxcnt] = nearestFinal.SLW.values.flatten()[0]
+        vxData['TMPnear'][vxcnt] = nearestFinal.TMP.values.flatten()[0]
     
-    # VARmean: val
-    if vMean:
-      print("MEAN")
-      vxData['VVELmean'][vxcnt] = finalHood.VVEL.mean(dim=list(finalHood.VVEL.dims)).values 
-      vxData['RHmean'][vxcnt] = finalHood.RH.mean(dim=list(finalHood.RH.dims)).values 
-      vxData['SLWmean'][vxcnt] = finalHood.SLW.mean(dim=list(finalHood.SLW.dims)).values 
-      vxData['TMPmean'][vxcnt] = finalHood.TMP.mean(dim=list(finalHood.TMP.dims)).values 
+      # VARmean: val
+      if vMean:
+        print("MEAN")
+        vxData['VVELmean'][vxcnt] = finalHood.VVEL.mean(dim=list(finalHood.VVEL.dims)).values 
+        vxData['RHmean'][vxcnt] = finalHood.RH.mean(dim=list(finalHood.RH.dims)).values 
+        vxData['SLWmean'][vxcnt] = finalHood.SLW.mean(dim=list(finalHood.SLW.dims)).values 
+        vxData['TMPmean'][vxcnt] = finalHood.TMP.mean(dim=list(finalHood.TMP.dims)).values 
     
-    # VARmed: val
-    if vMed:
-      print("MED")
-      #vxData['VVELmed'][vxcnt] = finalHood.VVEL.median(dim=list(finalHood.VVEL.dims)).values
-      vxData['VVELmed'][vxcnt] = stat.median(finalHood.VVEL.values.flatten())
-      vxData['RHmed'][vxcnt] = stat.median(finalHood.RH.values.flatten())
-      vxData['SLWmed'][vxcnt] = stat.median(finalHood.SLW.values.flatten())
-      vxData['TMPmed'][vxcnt] = stat.median(finalHood.TMP.values.flatten())
+      # VARmed: val
+      if vMed:
+        print("MED")
+        #vxData['VVELmed'][vxcnt] = finalHood.VVEL.median(dim=list(finalHood.VVEL.dims)).values
+        vxData['VVELmed'][vxcnt] = stat.median(finalHood.VVEL.values.flatten())
+        vxData['RHmed'][vxcnt] = stat.median(finalHood.RH.values.flatten())
+        vxData['SLWmed'][vxcnt] = stat.median(finalHood.SLW.values.flatten())
+        vxData['TMPmed'][vxcnt] = stat.median(finalHood.TMP.values.flatten())
     
-    # VARstdev: val
-    if vStdev:
-      print("STDEV")
-      vxData['VVELstdev'][vxcnt] = finalHood.VVEL.std(dim=list(finalHood.VVEL.dims)).values
-      vxData['RHstdev'][vxcnt] = finalHood.RH.std(dim=list(finalHood.RH.dims)).values
-      vxData['SLWstdev'][vxcnt] = finalHood.SLW.std(dim=list(finalHood.SLW.dims)).values
-      vxData['TMPstdev'][vxcnt] = finalHood.TMP.std(dim=list(finalHood.TMP.dims)).values
+      # VARstdev: val
+      if vStdev:
+        print("STDEV")
+        vxData['VVELstdev'][vxcnt] = finalHood.VVEL.std(dim=list(finalHood.VVEL.dims)).values
+        vxData['RHstdev'][vxcnt] = finalHood.RH.std(dim=list(finalHood.RH.dims)).values
+        vxData['SLWstdev'][vxcnt] = finalHood.SLW.std(dim=list(finalHood.SLW.dims)).values
+        vxData['TMPstdev'][vxcnt] = finalHood.TMP.std(dim=list(finalHood.TMP.dims)).values
 
     # Mins/maxes
     print("MIN/MAX")
@@ -406,7 +413,7 @@ for name, group in groups:
     if vScen:
       # PCPnear: val
       print("PCP")
-      vxData['PCPnear'][vxcnt] = ncData.SURF_PRECIP.isel(time=[0],z0=[-1],y0=group.homeJ.iloc[icnt],x0=group.homeI.iloc[icnt]).values.flatten()[0]
+      vxData['PCPnear'][vxcnt] = ncData.SURF_PRECIP.isel(z0=[-1],y0=group.homeJ.iloc[icnt],x0=group.homeI.iloc[icnt]).values.flatten()[0]
     
       # PCPuni/PCPmode:
       if min(regionDS.SURF_PRECIP.isel(z0=[-1]).values.flatten()) == max(regionDS.SURF_PRECIP.isel(z0=[-1]).values.flatten()):
@@ -446,8 +453,8 @@ for name, group in groups:
     vxData['nPtsStats'][vxcnt] = vxData['nPtsHood'][vxcnt]-xr.ufuncs.isnan(finalHood.HGT).sum(dim='z0').sum().values
    
     # Store the upper and lower index into the Z coordinate where data were selected
-    vxData['zBot'][vxcnt] = regionDS.get_index('z0').get_loc(regionDS.sel(z0=finalHood.z0.values[0]).z0.values.ravel()[0])
-    vxData['zTop'][vxcnt] = regionDS.get_index('z0').get_loc(regionDS.sel(z0=finalHood.z0.values[-1]).z0.values.ravel()[0])
+    vxData['kBot'][vxcnt] = regionDS.get_index('z0').get_loc(regionDS.sel(z0=finalHood.z0.values.max()).z0.values.ravel()[0])
+    vxData['kTop'][vxcnt] = regionDS.get_index('z0').get_loc(regionDS.sel(z0=finalHood.z0.values.min()).z0.values.ravel()[0])
 
     # Print out a row of the dataframe to see all the data we've collected for this PIREP
     print("")

@@ -17,7 +17,7 @@ from scipy.spatial import cKDTree
 import numpy as np
 
 # Define a function to load MDV dataset
-def load_mdv_dataset(mdvFiles,DEBUG):
+def load_mdv_dataset(mdvFiles,DEBUG,DROPTIME):
 
   # For each MDV file:
   # 1. Open file
@@ -37,14 +37,21 @@ def load_mdv_dataset(mdvFiles,DEBUG):
       print(time.time()-tt1)
     if fcnt==0:
       # If it's the first file, just set allData equal to this files' data
-      allData = fileData
+      # Remove time dimension if present
+      if 'time' in list(fileData.dims) and DROPTIME:
+        allData = fileData.isel(time=0).drop('time')
+      else:
+        allData = fileData
     else:
       # If it's not the first file, then set allData to a temporary varaible, delete allData, then reset
       # allData to the merge of the previous allData, and the current files' data
       tmpData = allData
       del(allData)
       tt2 = time.time()
-      allData = xr.merge([tmpData,fileData])
+      if 'time' in list(fileData.dims) and DROPTIME:
+        allData = xr.merge([tmpData,fileData.isel(time=0).drop('time')])
+      else:
+        allData = xr.merge([tmpData,fileData])
       if DEBUG:
         print("MERGE")
         print(time.time()-tt2)

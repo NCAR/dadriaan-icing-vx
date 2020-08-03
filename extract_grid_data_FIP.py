@@ -228,8 +228,11 @@ for name, group in groups:
   if vNWP:
     ncData['TOT_COND'] = ncData['ICE_COND']+ncData['LIQ_COND']
 
-  # Mask with TOPO
-  ncData = ncData.where(ncData.HGT>=ncData.TOPO.isel(z0=ncData.dims['z0']-1))
+  # Mask with TOPO, but don't mask SURF_PRECIP
+  vnames = list(ncData.data_vars.keys())
+  vnames.remove('SURF_PRECIP')
+  vnames.remove('TOPO')
+  ncData[vnames].where(ncData.HGT>=ncData.TOPO.isel(z0=ncData.dims['z0']-1))
 
   # Loop over each item in the series
   icnt = 0
@@ -329,7 +332,7 @@ for name, group in groups:
 
       # Compute a representative height near the middle of the range between pBot and pTop
       pNear = stat.mean([pBot,pTop]) 
-      
+
     # Find the closest z-level to the PIREP
     # Requires 2 steps: first, use sel to use the actual height values (coordinate indexing) then use isel to
     # get the correct i,j (positional indexing)
@@ -338,19 +341,19 @@ for name, group in groups:
    
     # Just find the nearest K-level now to the height closest to the pNear value (meanZPirep)
     nearestFinal = nearestHood.isel(z0=[np.argmin(abs((nearestHood.HGT.values*3.281)-pNear))])
-    
+
     # VARIABLES:
     # ncData: full dataset
     # regionDS: subset of full dataset containing all data within the X-Y region around the PIREP at all Z
     # finalHood: subset of the region dataset containing only those Z within 1000ft of PIREP
     # nearestHood: the closest X-Y point to the PIREP with all Z within 1000ft of PIREP
     # nearestFinal: the closest X-Y point to the PIREP and closest Z to the mean of the PIREP heights
- 
+  
     # Set some output data
     vxData['isMulti'][vxcnt] = isMulti
     vxData['levNear'][vxcnt] = nearestFinal.z0.values[0]
     vxData['zNear'][vxcnt] = nearestFinal.HGT.values[0]*3.281
-
+  
     # VARnear: val
     if vNWP:
       if vNear:

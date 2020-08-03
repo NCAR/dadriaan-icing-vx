@@ -179,28 +179,41 @@ for name, group in groups:
       else:
         ncFiles.append(u)
     # Double check files exist
+    SKIP = False
     for f in ncFiles:
       if not os.path.exists('%s' % (f)):
         print("")
         print("WARNING! FILE %s DOES NOT EXIST." % (f))
         print(group.file_string.iloc[0])
         print("")
-    ncData = icing.load_mdv_dataset(ncFiles,True,True)
-    ncData.chunk(chunks=chunks)
+        SKIP = True
+    if not SKIP:
+      ncData = icing.load_mdv_dataset(ncFiles,True,True)
+      ncData.chunk(chunks=chunks)
+    else:
+      vxData['badPirep'][vxcnt] = True
+      vxcnt = vxcnt + 1
+      continue
   elif ff=="netcdf":
     for u in aurls:
       ncFiles.append('%s/%s' % (u,group.file_string.iloc[0]))
     for u in murls:
       ncFiles.append('%s/%s' % (u,group.mfile_string.iloc[0]))
     # Double check files exist
+    SKIP = False
     for f in ncFiles:
       if not os.path.exists('%s' % (f)):
         print("")
         print("WARNING! FILE %s DOES NOT EXIST." % (f))
         print(group.file_string.iloc[0])
         print("")
-    #ncData = xr.open_mfdataset(ncFiles,chunks=chunks,combine='by_coords',compat='override')
-    ncData = xr.open_mfdataset(ncFiles,chunks=chunks,combine='by_coords')
+        SKIP = True
+    if not SKIP:
+      #ncData = xr.open_mfdataset(ncFiles,chunks=chunks,combine='by_coords',compat='override')
+      ncData = xr.open_mfdataset(ncFiles,chunks=chunks,combine='by_coords')
+    else:
+      vxData['badPirep'][vxcnt] = True
+      vxcnt = vxcnt + 1
   else:
     print("")
     print("UNKNOWN FILE FORMAT.")
@@ -239,7 +252,9 @@ for name, group in groups:
     ncData['TOT_COND'] = ncData['ICE_COND']+ncData['LIQ_COND']
 
   # Mask with TOPO
-  ncData = ncData.where(ncData.HGT>=ncData.TOPO.isel(z0=0))
+  vnames = list(ncData.data_vars.keys())
+  vnames.remove('TOPO')
+  ncData[vnames].where(ncData.HGT>=ncData.TOPO.isel(z0=0))
 
   # Loop over each item in the series
   icnt = 0
@@ -455,9 +470,9 @@ for name, group in groups:
           vxData['SCENmode'][vxcnt] = finalHood.SEV_SCENARIO.min().round().values
         else:
           vxData['SCENuni'][vxcnt] = False
-          #print(np.unique(finalHood.SEV_SCENARIO.values.flatten().round()))
-          vxData['SCENs'][vxcnt] = np.unique(finalHood.SEV_SCENARIO.values.flatten().round())
-          vxData['SCENmode'][vxcnt] = stats.mode(finalHood.SEV_SCENARIO.values.flatten())[0].round()[0]
+          vxData['SCENs'][vxcnt] = np.unique(finalHood.SEV_SCENARIO.values.flatten().round()[~np.isnan(finalHood.SEV_SCENARIO.values.flatten().round())])
+          #print(vxData['SCENs'][vxcnt])
+          vxData['SCENmode'][vxcnt] = stats.mode(finalHood.SEV_SCENARIO.values.flatten()[~np.isnan(finalHood.SEV_SCENARIO.values.flatten())])[0].round()[0]
 
       # Since POT_SCENARIO is initialized to NaN, the entire neighborhood could be NaN. Leave the PSCENuni set to NaN if so.
       if not xr.ufuncs.isnan(finalHood.POT_SCENARIO.values.flatten().round()).all() and vScen:
@@ -466,9 +481,9 @@ for name, group in groups:
           vxData['PSCENmode'][vxcnt] = finalHood.POT_SCENARIO.min().round().values
         else:
           vxData['PSCENuni'][vxcnt] = False
-          #print(np.unique(finalHood.POT_SCENARIO.values.flatten().round()))
-          vxData['PSCENs'][vxcnt] = np.unique(finalHood.POT_SCENARIO.values.flatten().round())
-          vxData['PSCENmode'][vxcnt] = stats.mode(finalHood.POT_SCENARIO.values.flatten())[0].round()[0]
+          vxData['PSCENs'][vxcnt] = np.unique(finalHood.POT_SCENARIO.values.flatten().round()[~np.isnan(finalHood.POT_SCENARIO.values.flatten().round())])
+          #print(vxData['PSCENs'][vxcnt])
+          vxData['PSCENmode'][vxcnt] = stats.mode(finalHood.POT_SCENARIO.values.flatten()[~np.isnan(finalHood.POT_SCENARIO.values.flatten())])[0].round()[0]
 
       # Since SLD_SCENARIO is initialized to NaN, the entire neighborhood could be NaN. Leave the LSCENuni set to NaN if so.
       if not xr.ufuncs.isnan(finalHood.SLD_SCENARIO.values.flatten().round()).all() and vScen:
@@ -477,9 +492,9 @@ for name, group in groups:
           vxData['LSCENmode'][vxcnt] = finalHood.SLD_SCENARIO.min().round().values
         else:
           vxData['LSCENuni'][vxcnt] = False
-          #print(np.unique(finalHood.SLD_SCENARIO.values.flatten().round()))
-          vxData['LSCENs'][vxcnt] = np.unique(finalHood.SLD_SCENARIO.values.flatten().round())
-          vxData['LSCENmode'][vxcnt] = stats.mode(finalHood.SLD_SCENARIO.values.flatten())[0].round()[0]
+          vxData['LSCENs'][vxcnt] = np.unique(finalHood.SLD_SCENARIO.values.flatten().round()[~np.isnan(finalHood.SLD_SCENARIO.values.flatten().round())])
+          #print(vxData['LSCENs'][vxcnt])
+          vxData['LSCENmode'][vxcnt] = stats.mode(finalHood.SLD_SCENARIO.values.flatten()[~np.isnan(finalHood.SLD_SCENARIO.values.flatten())])[0].round()[0]
     
     # nPtsHood: Number of total non-NaN points in the finalHood
     print("NPTS")

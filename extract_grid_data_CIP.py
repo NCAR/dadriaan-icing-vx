@@ -44,7 +44,6 @@ vAlgo = p.opt['vAlgo']   # CIP processing
 
 # Model string
 mstring = p.opt['mstring']
-mid = p.opt['m_id']
 
 # Define chunks. Try to keep chunks ~ 1M pts
 # Higher numbers = smaller chunks, lower numbers = bigger chunks
@@ -72,15 +71,15 @@ murls = []
 if vAlgo:
   for v in p.opt['avars']:
     if v in ['ICE_PROB','ICE_SEV','SLD']:
-      aurls.append(os.path.join(p.opt['aurl_pref'],mstring,'data/%s/cip/pressure/conus_%s' % (ff,v)))
+      aurls.append(os.path.join(p.opt['aurl_pref'],'pressure/conus_%s' % (v)))
     if v in ['SEV_SCENARIO','SLD_SCENARIO','POT_SCENARIO']:
-      aurls.append(os.path.join(p.opt['aurl_pref'],mstring,'data/%s/cip/diagnostic/conus_%s' % (ff,v)))
+      aurls.append(os.path.join(p.opt['aurl_pref'],'diagnostic/conus_%s' % (v)))
 if vNWP:
   for v in p.opt['mvars']:
     if v not in ['HGT']:
-      murls.append(os.path.join(p.opt['murl_pref'],mstring,'data/%s/model' % (ff),mid,'pressure_derived/conus_%s' % (v)))
+      murls.append(os.path.join(p.opt['murl_pref'],'pressure_derived/conus_%s' % (v)))
 # Always load HGT      
-murls.append(os.path.join(p.opt['murl_pref'],mstring,'data/%s/model' % (ff),mid,'pressure_derived/conus_HGT'))
+murls.append(os.path.join(p.opt['murl_pref'],'pressure_derived/conus_HGT'))
 # Always load TOPO
 murls.append(p.opt['topo_file'])
 

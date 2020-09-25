@@ -69,15 +69,15 @@ urls = []
 if vAlgo:
   for v in p.opt['avars']:
     if v in ['ICE_PROB','ICE_SEV','SLD']:
-      urls.append(os.path.join(p.opt['aurl_pref'],mstring,'data/%s/fip/pressure/conus_%s' % (ff,v)))
+      urls.append(os.path.join(p.opt['aurl_pref'],'pressure/conus_%s' % (ff,v)))
     if v in ['SEV_SCENARIO','SLD_SCENARIO','POT_SCENARIO','SURF_PRECIP','ICE']:
-      urls.append(os.path.join(p.opt['aurl_pref'],mstring,'data/%s/fip/diagnostic/conus_%s' % (ff,v)))
+      urls.append(os.path.join(p.opt['aurl_pref'],'diagnostic/conus_%s' % (ff,v)))
 if vNWP:
   for v in p.opt['mvars']:
     if v not in ['HGT']:
-      urls.append(os.path.join(p.opt['murl_pref'],mstring,'data/%s/model' % (ff),mid,'pressure_derived/conus_%s' % (v)))
+      urls.append(os.path.join(p.opt['murl_pref'],'pressure_derived/conus_%s' % (v)))
 # Always load HGT
-urls.append(os.path.join(p.opt['murl_pref'],mstring,'data/%s/model' % (ff),mid,'pressure_derived/conus_HGT'))
+urls.append(os.path.join(p.opt['murl_pref'],'pressure_derived/conus_HGT'))
 # Always load TOPO
 urls.append(p.opt['topo_file'])
 

@@ -120,6 +120,50 @@ match_time_minutes = 0
 #              
 input_csv_columns = ['unix_time','lat','lon','flvl','cbase1','cvg1','ctop1','cbase2','cvg2','ctop2','vis','obx','temp','wdir','wspd','ibase1','itop1','iint1','ityp1','ibase2','itop2','iint2','ityp2','tbase1','ttop1','tint1','ttyp1','tfreq1','tbase2','ttop2','tint2','ttyp2','tfreq2','actype','rawrep']
 
+####### output_csv_columns #######
+#
+# NAME: output_csv_columns
+# OPTIONS:
+# TYPE: list
+# FORMAT:
+# DEFAULT: input_csv_columns
+# DESCRIPTION: Provide a list of column names from the input to be included in the output. These will be prepended to the default output from the matching code
+#
+output_csv_columns = input_csv_columns
+
+####### latlon_colmap #######
+#
+# NAME: latlon_colmap
+# OPTIONS:
+# TYPE: dict
+# FORMAT:
+# DEFAULT:
+# DESCRIPTION: Provide a mapping from the column names in the input_csv_columns for latitude and longitude to the expected "lat" and "lon" values
+#
+latlon_colmap = {}
+
+####### skipNrows #######
+#
+# NAME: skipNrows
+# OPTIONS:
+# TYPE: integer
+# FORMAT:
+# DEFAULT: 0
+# DESCRIPTION: "skiprows" argument to pandas read_csv()
+#
+skipNrows = 0
+
+####### dtinfo #######
+#
+# NAME: dtinfo
+# OPTIONS:
+# TYPE: dict
+# FORMAT:
+# DEFAULT: {}
+# DESCRIPTION: dictionary mapping of input_csv_columns and datetime strptime formatting to use
+#
+dtinfo = {}
+
 ####### model_name #######
 #
 # NAME: model_name

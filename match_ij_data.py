@@ -86,8 +86,42 @@ try:
 except OSError:
   pass
 
+# Get the column names
+column_names = p.opt['input_csv_columns']
+
 # Open input file
-df = pd.read_csv(ptobs,header=None,names=p.opt['input_csv_columns'])
+df = pd.read_csv(ptobs,header=None,names=column_names,index_col=False,skiprows=p.opt['skipNrows'])
+
+# Rename lat/lon if needed, and also adjust the column names to match for writing output
+if p.opt['latlon_colmap'] != {}:
+  df = df.rename(columns=p.opt['latlon_colmap'])
+  for k in list(p.opt['latlon_colmap'].keys()):
+    column_names.remove(k)
+  for v in list(p.opt['latlon_colmap'].values()):
+    column_names.append(v)
+
+# Drop anywhere lat/lon are missing
+df = df.loc[df[df['lat']>-9000.0].index]
+
+# Handle time. If unix_time is provided, then use it. Otherwise construct a unix_time column using the dtinfo conf option
+if 'unix_time' not in p.opt['input_csv_columns']:
+  print("\nNO UNIX TIME FOUND. CONSTRUCTING USING dtinfo PARAM.")
+
+  # Get the list of column names containing the date info
+  keylist = list(p.opt['dtinfo'].keys())
+
+  # Get the column formatting for each date info column
+  valuelist = list(p.opt['dtinfo'].values())
+
+  # Create the UNIX_TIME by doing:
+  # 1. Apply a lambda function to join each column with date info together
+  # 2. Convert it to a datetime object using the formatting specified for each column by the user
+  # 3. Subtract off the EPOCH time (1970-1-1 00:00:00) and then floor divide by 1s per the Pandas documentation here:
+  #    https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#from-timestamps-to-epoch
+  df['unix_time'] = (pd.to_datetime(df[keylist].apply(lambda x: ''.join(x), axis=1),format=''.join(valuelist)) - pd.Timestamp('1970-1-1')) // pd.Timedelta('1s')
+
+  # Add the new column to the column names
+  column_names.append('unix_time')
 
 # Open the grid file
 grid = pyart.io.read_grid_mdv(mdv,file_field_names=True,exclude_fields=[])
@@ -315,9 +349,17 @@ df.loc[df.index,('totPts')] = ((df['maxI']-df['minI'])+1)*((df['maxJ']-df['minJ'
 #df['file_string'] = ""
 df['nsecfcst'] = nsecfcst
 
-# Columns we want are:
-# index,unix_time,lat,lon,flvl,temp,ibase1,itop1,iint1,ityp1,ibase2,itop2,iint2,ityp2,acft,rawObs,tmatch,nsecfcst,minI,maxI,minJ,maxJ,homeI,homeJ,corner,totPts,mfile_string,file_string
+# The columns we want by default from the matching code are:
+# ['tmatch','nsecfcst','minI','maxI','minJ','maxJ','home_i','home_j','corner','totPts','mfile_string','file_string','obsfiletime']
+
+# Prepend the user "output_csv_columns" to this list
+default_out_cols = ['tmatch','nsecfcst','minI','maxI','minJ','maxJ','home_i','home_j','corner','totPts','mfile_string','file_string','obsfiletime']
+all_out_cols = p.opt['output_csv_columns']+default_out_cols
+
+# Reset the index
 df = df.reset_index(drop=True)
-df.to_csv(out,header=False,columns=['unix_time','lat','lon','flvl','temp','ibase1','itop1','iint1','ityp1','ibase2','itop2','iint2','ityp2','actype','rawrep','tmatch','nsecfcst','minI','maxI','minJ','maxJ','home_i','home_j','corner','totPts','mfile_string','file_string','obsfiletime'])
+
+# Write out
+df.to_csv(out,header=False,columns=all_out_cols)
 print("")
 print("PROCESSING TOOK: "+str(calendar.timegm(time.gmtime())-start_time)+" SECONDS.")

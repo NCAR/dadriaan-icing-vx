@@ -164,6 +164,17 @@ skipNrows = 0
 #
 dtinfo = {}
 
+####### write_header #######
+#
+# NAME: write_header
+# OPTIONS: True or False
+# TYPE: boolean
+# FORMAT:
+# DEFAULT: False
+# DESCRIPTION: Specify whether to write a header in the output file or not
+#
+write_header = False
+
 ####### model_name #######
 #
 # NAME: model_name

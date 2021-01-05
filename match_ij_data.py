@@ -360,6 +360,6 @@ all_out_cols = p.opt['output_csv_columns']+default_out_cols
 df = df.reset_index(drop=True)
 
 # Write out
-df.to_csv(out,header=False,columns=all_out_cols)
+df.to_csv(out,header=p.opt['write_header'],columns=all_out_cols,index=False)
 print("")
 print("PROCESSING TOOK: "+str(calendar.timegm(time.gmtime())-start_time)+" SECONDS.")

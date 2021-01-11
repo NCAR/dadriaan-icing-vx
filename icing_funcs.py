@@ -10,6 +10,7 @@ import math
 import datetime
 import glob
 import itertools
+import pyart
 
 from math import pi
 from numpy import cos, sin
@@ -17,7 +18,7 @@ from scipy.spatial import cKDTree
 import numpy as np
 
 # Define a function to load MDV dataset
-def load_mdv_dataset(mdvFiles,DEBUG,DROPTIME):
+def load_mdv_dataset(mdvFiles,keepvars=[],DEBUG=False,DROPTIME=False):
 
   # For each MDV file:
   # 1. Open file
@@ -30,7 +31,10 @@ def load_mdv_dataset(mdvFiles,DEBUG,DROPTIME):
   for f in mdvFiles:
     # Read the current file into an xarray dataset
     tt1 = time.time()
-    fileData = pyart.io.read_grid_mdv(f,file_field_names=True,exclude_fields=[]).to_xarray()
+    if keepvars==[]:
+      fileData = pyart.io.read_grid_mdv(f,file_field_names=True,exclude_fields=[]).to_xarray()
+    else:
+      fileData = pyart.io.read_grid_mdv(f,field_names={keepvars[x]:keepvars[x] for x in range(len(keepvars))},exclude_fields=[]).to_xarray()
     if DEBUG:
       print("READ")
       print(f)
@@ -65,12 +69,46 @@ def load_mdv_dataset(mdvFiles,DEBUG,DROPTIME):
     del(fileData)
     fcnt = fcnt + 1
 
+  # Drop any variables we don't want
+  dropvars = []
+  for v in keepvars:
+    if v not in allData.data_vars.keys():
+      dropvars.append(v)
+  allData = allData.drop_vars(dropvars)
+
   # Return the MDV dataset object
   if DEBUG:
     print(time.time()-st)
   allData = allData.rename({'x':'x0','y':'y0','z':'z0'})
   return(allData)
 
+# Define a function to load a GRIB2 dataset
+def load_grib2_dataset(gribfile,fieldnames,leveltype,DEBUG):
+
+  # For each GRIB2 file:
+  # 1. Open file
+  # 2. Load as xarray dataset
+  # 3. Merge with existing dataset if existing dataset
+  # 4. Delete single variable dataset
+
+  st = time.time()
+  # Read the current file into an xarray dataset
+  tt1 = time.time()
+  for n in fieldnames:
+    if DEBUG:
+      print("READ")
+      print(n)
+      print(time.time()-tt1)
+    tmpds = xr.open_dataset(gribfile,engine='cfgrib',backend_kwargs={'filter_by_keys':{'typeOfLevel':leveltype,'cfVarName':n},'indexpath':''})
+    if 'ds' in locals():
+      ds = xr.merge([ds,tmpds])
+    else:
+      ds = tmpds
+  if DEBUG:
+    print("RETURN")
+    print(time.time()-tt1)
+  return(ds)
+      
 # Load HRRR projection params into a CF-compliant dictionary
 def load_hrrr_proj(data):
 

@@ -115,7 +115,7 @@ def load_hrrr_proj(data):
   cfparams = {}
   cfparams['grid_mapping_name'] = "lambert_conformal_conic"
   cfparams['standard_parallel'] = 38.5
-  cfparams['longitude_of_projection_origin'] = -97.5
+  cfparams['longitude_of_central_meridian'] = -97.5
   cfparams['latitude_of_projection_origin'] = 38.5
   cfparams['earth_radius'] = 6371229.0 # HRRR SPHERE
   cfparams['projection_x_coordinate'] = data.x.values
@@ -133,7 +133,7 @@ def load_rap_proj(data):
   cfparams = {}
   cfparams['grid_mapping_name'] = "lambert_conformal_conic"
   cfparams['standard_parallel'] = 25.0
-  cfparams['longitude_of_projection_origin'] = -95.0
+  cfparams['longitude_of_central_meridian'] = -95.0
   cfparams['latitude_of_projection_origin'] = 25.0
   cfparams['earth_radius'] = 6371229.0 # RAP SPHERE
   cfparams['projection_x_coordinate'] = data.x.values
@@ -151,7 +151,7 @@ def load_goes16_proj(data):
   cfparams = {}
   cfparams['grid_mapping_name'] = "lambert_conformal_conic"
   cfparams['standard_parallel'] = 25.0
-  cfparams['longitude_of_projection_origin'] = -95.0
+  cfparams['longitude_of_central_meridian'] = -95.0
   cfparams['latitude_of_projection_origin'] = 25.0
   cfparams['earth_radius'] = 6371000.0 # MDV SPHERE
   cfparams['projection_x_coordinate'] = data.x.values

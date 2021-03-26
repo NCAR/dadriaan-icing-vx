@@ -141,7 +141,7 @@ for name, group in groups:
         print("FATAL! FILE %s DOES NOT EXIST." % (f))
         print("")
         exit()
-    ncData = icing.load_mdv_dataset(ncFiles,DEBUG=True,DROPTIMES=False)
+    ncData = icing.load_mdv_dataset(ncFiles,DEBUG=True,DROPTIME=False)
     if p.opt['chunk']:
       ncData.chunk(chunks=chunks)
   elif ff=="netcdf":

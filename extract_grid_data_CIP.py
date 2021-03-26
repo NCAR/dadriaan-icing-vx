@@ -187,7 +187,7 @@ for name, group in groups:
         print("")
         SKIP = True
     if not SKIP:
-      ncData = icing.load_mdv_dataset(ncFiles,DEBUG=True,DROPTIMES=True)
+      ncData = icing.load_mdv_dataset(ncFiles,DEBUG=True,DROPTIME=True)
       ncData.chunk(chunks=chunks)
     else:
       vxData['badPirep'][vxcnt] = True

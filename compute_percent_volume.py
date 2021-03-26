@@ -49,9 +49,9 @@ Algo = True
 
 # Read data
 if Algo:
-  data = icing.load_mdv_dataset([f,fz],DEBUG=True,DROPTIMES=False)
+  data = icing.load_mdv_dataset([f,fz],DEBUG=True,DROPTIME=False)
 else:
-  data = icing.load_mdv_dataset([f],DEBUG=True,DROPTIMES=False)
+  data = icing.load_mdv_dataset([f],DEBUG=True,DROPTIME=False)
 
 if Algo:
   # Correct NA data in certain variables

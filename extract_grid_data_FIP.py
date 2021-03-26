@@ -179,7 +179,7 @@ for name, group in groups:
         print("WARNING! FILE %s DOES NOT EXIST." % (f))
         print(group.mfile_string.iloc[0])
         print("")
-    ncData = icing.load_mdv_dataset(ncFiles,True,True)
+    ncData = icing.load_mdv_dataset(ncFiles,DEBUG=True,DROPTIMES=True)
     ncData.chunk(chunks=chunks)
   elif ff=="netcdf":
     for u in urls:

@@ -70,9 +70,9 @@ murls = []
 # Fill up lists
 if vAlgo:
   for v in p.opt['avars']:
-    if v in ['ICE_PROB','ICE_SEV','SLD']:
-      aurls.append(os.path.join(p.opt['aurl_pref'],'pressure/conus_%s' % (v)))
-    if v in ['SEV_SCENARIO','SLD_SCENARIO','POT_SCENARIO']:
+    #if v in ['ICE_PROB','ICE_SEV','SLD']:
+    #  aurls.append(os.path.join(p.opt['aurl_pref'],'pressure/conus_%s' % (v)))
+    if v in ['SEV_SCENARIO','SLD_SCENARIO','POT_SCENARIO','ICE_PROB','ICE_SEV','SLD']:
       aurls.append(os.path.join(p.opt['aurl_pref'],'diagnostic/conus_%s' % (v)))
 if vNWP:
   for v in p.opt['mvars']:
@@ -213,6 +213,7 @@ for name, group in groups:
     else:
       vxData['badPirep'][vxcnt] = True
       vxcnt = vxcnt + 1
+      continue
   else:
     print("")
     print("UNKNOWN FILE FORMAT.")

@@ -68,10 +68,10 @@ urls = []
 # Fill up lists
 if vAlgo:
   for v in p.opt['avars']:
-    if v in ['ICE_PROB','ICE_SEV','SLD']:
-      urls.append(os.path.join(p.opt['aurl_pref'],'pressure/conus_%s' % (ff,v)))
-    if v in ['SEV_SCENARIO','SLD_SCENARIO','POT_SCENARIO','SURF_PRECIP','ICE']:
-      urls.append(os.path.join(p.opt['aurl_pref'],'diagnostic/conus_%s' % (ff,v)))
+    #if v in ['ICE_PROB','ICE_SEV','SLD']:
+    #  urls.append(os.path.join(p.opt['aurl_pref'],'pressure/conus_%s' % (v)))
+    if v in ['SEV_SCENARIO','SLD_SCENARIO','POT_SCENARIO','SURF_PRECIP','ICE','ICE_PROB','ICE_SEV','SLD']:
+      urls.append(os.path.join(p.opt['aurl_pref'],'diagnostic/conus_%s' % (v)))
 if vNWP:
   for v in p.opt['mvars']:
     if v not in ['HGT']:
@@ -173,26 +173,40 @@ for name, group in groups:
       else:
         ncFiles.append(u)
     # Double check files exist
+    SKIP = False
     for f in ncFiles:
       if not os.path.exists('%s' % (f)):
         print("")
         print("WARNING! FILE %s DOES NOT EXIST." % (f))
         print(group.mfile_string.iloc[0])
         print("")
-    ncData = icing.load_mdv_dataset(ncFiles,DEBUG=True,DROPTIME=True)
-    ncData.chunk(chunks=chunks)
+        SKIP = True
+    if not SKIP:
+      ncData = icing.load_mdv_dataset(ncFiles,DEBUG=True,DROPTIME=True)
+      ncData.chunk(chunks=chunks)
+    else:
+      vxData['badPirep'][vxcnt] = True
+      vxcnt = vxcnt + 1
+      continue
   elif ff=="netcdf":
     for u in urls:
       ncFiles.append('%s/%s' % (u,group.mfile_string.iloc[0]))
     # Double check files exist
+    SKIP = False
     for f in ncFiles:
       if not os.path.exists('%s' % (f)):
         print("")
         print("WARNING! FILE %s DOES NOT EXIST." % (f))
         print(group.mfile_string.iloc[0])
         print("")
-    #ncData = xr.open_mfdataset(ncFiles,chunks=chunks,combine='by_coords',parallel=True)
-    ncData = xr.open_mfdataset(ncFiles,chunks=chunks,combine='by_coords')
+        SKIP = True
+    if not SKIP:
+      #ncData = xr.open_mfdataset(ncFiles,chunks=chunks,combine='by_coords',parallel=True)
+      ncData = xr.open_mfdataset(ncFiles,chunks=chunks,combine='by_coords')
+    else:
+      vxData['badPirep'][vxcnt] = True
+      vxcnt = vxcnt + 1
+      continue
   else:
     print("")
     print("UNKNOWN FILE FORMAT.")
@@ -418,17 +432,17 @@ for name, group in groups:
     if vScen:
       # PCPnear: val
       print("PCP")
-      vxData['PCPnear'][vxcnt] = ncData.SURF_PRECIP.isel(z0=[-1],y0=group.homeJ.iloc[icnt],x0=group.homeI.iloc[icnt]).values.flatten()[0]
+      vxData['PCPnear'][vxcnt] = ncData.SURF_PRECIP.isel(z0=[0],y0=group.homeJ.iloc[icnt],x0=group.homeI.iloc[icnt]).values.flatten()[0]
     
       # PCPuni/PCPmode:
-      if min(regionDS.SURF_PRECIP.isel(z0=[-1]).values.flatten()) == max(regionDS.SURF_PRECIP.isel(z0=[-1]).values.flatten()):
+      if min(regionDS.SURF_PRECIP.isel(z0=[0]).values.flatten()) == max(regionDS.SURF_PRECIP.isel(z0=[0]).values.flatten()):
         vxData['PCPuni'][vxcnt] = True
         vxData['PCPmode'][vxcnt] = regionDS.SURF_PRECIP.min().round().values
       else:
         vxData['PCPuni'][vxcnt] = False
         #print(np.unique(regionDS.SURF_PRECIP.isel(z0=[-1]).values.flatten().round()))
-        vxData['PCPs'][vxcnt] = np.unique(regionDS.SURF_PRECIP.isel(z0=[-1]).values.flatten().round())
-        vxData['PCPmode'][vxcnt] = stats.mode(regionDS.SURF_PRECIP.isel(z0=[-1]).values.flatten())[0][0]
+        vxData['PCPs'][vxcnt] = np.unique(regionDS.SURF_PRECIP.isel(z0=[0]).values.flatten().round())
+        vxData['PCPmode'][vxcnt] = stats.mode(regionDS.SURF_PRECIP.isel(z0=[0]).values.flatten())[0][0]
     
       # SCENnear: val
       print("SCEN")
